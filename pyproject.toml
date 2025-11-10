@@ -1,0 +1,9 @@
+[tool.pytest.ini_options]
+testpaths = ["src/tests"]
+python_files = ["test_*.py"]
+pythonpath = ["src/python"]
+addopts = ["-v", "--tb=short"]
+
+[tool.coverage.run]
+source = ["src/python"]
+omit = ["*/test_*.py", "*/__pycache__/*"]

@@ -1,56 +1,36 @@
-"""
-AI utility functions for generating quiz questions and evaluating answers.
-Uses OpenAI API for question generation and answer evaluation.
-"""
 import os
+import boto3
+from openai import OpenAI
 
-# Optional third-party imports. Wrap in try/except so linters and static
-# checks in environments that don't have these packages installed won't
-# immediately fail on import. At runtime, missing packages will raise a
-# clear RuntimeError when trying to use functionality that requires them.
-try:
-    import boto3
-    BOTO3_AVAILABLE = True
-except ImportError:  # pragma: no cover - defensive for linting environments
-    boto3 = None  # type: ignore
-    BOTO3_AVAILABLE = False
+# Importing config class in config.py
+from config import Config
 
-try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
-except ImportError:  # pragma: no cover - defensive for linting environments
-    OpenAI = None  # type: ignore
-def _get_api_key_from_ssm(parameter_name='/devops-quiz/openai-api-key'):
-    """Try to read the API key from AWS SSM Parameter Store.
-
-    Returns the key string or raises RuntimeError if boto3 isn't available
-    or the parameter can't be read.
+def _get_api_key_from_ssm():
     """
-    if not BOTO3_AVAILABLE or boto3 is None:
-        raise RuntimeError('boto3 is required to read API key from SSM')
-
+    Try to read the API key from AWS SSM Parameter Store.
+    """
+    
     ssm = boto3.client('ssm')
-    resp = ssm.get_parameter(Name=parameter_name, WithDecryption=True)
+    resp = ssm.get_parameter(Name=Config.SSM_PARAMETER_NAME, WithDecryption=True)
     return resp['Parameter']['Value']
 
 
 def _get_openai_client():
-    """Lazily construct and return an OpenAI client.
+    """Construct and return an OpenAI client.
 
     This defers import/runtime errors until the functionality is used and
     allows static analysis in environments without third-party packages.
     """
-    api_key = os.environ.get('OPENAI_API_KEY')
+
+    api_key = Config.OPENAI_API_KEY
     if not api_key:
         api_key = _get_api_key_from_ssm()
-
-    if not OPENAI_AVAILABLE or OpenAI is None:
-        raise RuntimeError('openai package is required to use AI utilities')
 
     return OpenAI(api_key=api_key)
 
 def generate_question(category, keyword, difficulty):
     """Generate a question for a keyword and difficulty level."""
+    
     difficulty_label = {
         1: "basic level",
         2: "intermediate level",
@@ -65,13 +45,14 @@ def generate_question(category, keyword, difficulty):
 
     client = _get_openai_client()
     api_response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=Config.OPENAI_MODEL,
         messages=[{"role": "user", "content": prompt}],
     )
     return api_response.choices[0].message.content.strip()
 
 def evaluate_answer(question, answer, difficulty):
     """Generate a response based on the question and answer."""
+    
     difficulty_label = {
         1: "basic level",
         2: "intermediate level",
@@ -86,10 +67,11 @@ def evaluate_answer(question, answer, difficulty):
 
     client = _get_openai_client()
     api_response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=Config.OPENAI_MODEL,
         messages=[{"role": "user", "content": prompt}],
     )
     return api_response.choices[0].message.content.strip()
+
 
 QUESTION_PROMPT = {
     1: (
