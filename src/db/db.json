@@ -1,0 +1,386 @@
+{
+  "Containers": {
+    "Basics": {
+      "keywords": [
+        "Container",
+        "Container engine",
+        "Container image",
+        "Container repository",
+        "Namespaces",
+        "Cgroups (control groups)",
+        "Union file system",
+        "Monolithic architecture",
+        "Microservice architecture"
+      ]
+    },
+    "Docker Commands": {
+      "keywords": [
+        "cp",
+        "run",
+        "inspect",
+        "ps (-a)",
+        "commit",
+        "start",
+        "build",
+        "stop",
+        "top",
+        "rm",
+        "logs",
+        "attach",
+        "diff",
+        "exec",
+        "info",
+        "kill",
+        "stats"
+      ]
+    },
+    "Docker Architecture": {
+      "keywords": [
+        "Docker Engine",
+        "Docker daemon (dockerd)",
+        "Docker CLI",
+        "Docker registry",
+        "Docker Hub",
+        "Dockerfile",
+        "Docker network drivers",
+        "Docker storage",
+        "Docker logging drivers",
+        "Multi-stage build",
+        "Docker Compose",
+        "Docker Swarm",
+        ".dockerignore",
+        "Docker context"
+      ]
+    }
+  },
+  "Kubernetes": {
+    "Architecture": {
+      "keywords": [
+        "Container orchestration platform",
+        "Kubernetes (K8s)",
+        "Kubernetes API",
+        "Container runtime",
+        "Workload",
+        "Pod",
+        "Deployment",
+        "Service",
+        "Ingress",
+        "Replica set",
+        "Master node components (control plane)",
+        "kube-apiserver",
+        "kube-scheduler",
+        "kube-controller-manager",
+        "Node controller",
+        "Job controller",
+        "Endpoints controller",
+        "ServiceAccount & Token controllers",
+        "etcd",
+        "Worker node components",
+        "Kubelet",
+        "Podspecs",
+        "kube-proxy",
+        "ServiceAccount",
+        "Autoscaling methods",
+        "Horizontal Pod Autoscaler (HPA)",
+        "Vertical Pod Autoscaler (VPA)",
+        "Cluster Autoscaler",
+        "Requests vs Limits",
+        "kubectl",
+        "minikube",
+        "kubeadm",
+        "YAML / JSON object configuration files"
+      ]
+    },
+    "Commands": {
+      "keywords": [
+        "kubectl create",
+        "kubectl apply",
+        "kubectl run",
+        "kubectl describe",
+        "kubectl set",
+        "kubectl attach",
+        "kubectl get",
+        "kubectl top",
+        "kubectl delete",
+        "kubectl logs",
+        "kubectl cp",
+        "kubectl scale",
+        "kubectl expose",
+        "kubectl autoscale"
+      ]
+    }
+  },
+  "Git": {
+    "Basics": {
+      "keywords": [
+        "Version control system (VCS)",
+        "Source control management (SCM)",
+        "Local version control system",
+        "Centralized version control system",
+        "Distributed version control system",
+        "Branch strategy",
+        "Version scheme"
+      ]
+    },
+    "Architecture": {
+      "keywords": [
+        "Working directory",
+        "Staging",
+        "Committing",
+        "Branching",
+        "Merging",
+        "HEAD",
+        "Merge request",
+        "Merge conflict"
+      ]
+    },
+    "Commands": {
+      "keywords": [
+        "git fetch",
+        "git merge",
+        "git stash",
+        "git revert",
+        "git checkout",
+        "git diff",
+        "git tag",
+        "git reset",
+        "git rebase",
+        "git branch",
+        "git log",
+        "git clean"
+      ]
+    }
+  },
+  "SQL": {
+    "Structure": {
+      "keywords": [
+        "Database",
+        "DBMS",
+        "Transaction",
+        "Query",
+        "Nested query",
+        "Schema",
+        "RDBMS",
+        "ACID vs BASE",
+        "SQL",
+        "Row",
+        "Column",
+        "Table",
+        "View",
+        "Unique key",
+        "Primary key",
+        "Foreign key",
+        "Data normalization"
+      ]
+    },
+    "Commands": {
+      "keywords": [
+        "SELECT",
+        "DISTINCT",
+        "ALTER",
+        "INSERT",
+        "LIMIT",
+        "CREATE",
+        "UPDATE",
+        "COUNT",
+        "DROP",
+        "DELETE",
+        "MAX / MIN",
+        "GRANT / REVOKE",
+        "WHERE",
+        "AVG",
+        "SUM",
+        "ORDER / GROUP BY",
+        "LIKE",
+        "DESC",
+        "BETWEEN",
+        "JOIN",
+        "VIEW",
+        "UNION",
+        "AND",
+        "OR"
+      ]
+    }
+  },
+  "Cloud": {
+    "Basics": {
+      "keywords": [
+        "On-premise",
+        "Cloud Computing",
+        "Public cloud",
+        "Private cloud",
+        "Hybrid cloud",
+        "IaaS / SaaS / PaaS",
+        "Shared Responsibility Model",
+        "Cloud application",
+        "Scalability",
+        "Elasticity",
+        "GCP",
+        "Azure",
+        "OpenStack"
+      ]
+    },
+    "AWS": {
+      "keywords": [
+        "Global data center",
+        "Region",
+        "Availability Zone",
+        "AWS Management Console",
+        "CloudShell",
+        "AMI",
+        "Instance launch template",
+        "EC2",
+        "EFS",
+        "EBS",
+        "S3",
+        "VPC",
+        "IAM",
+        "RDS",
+        "DynamoDB",
+        "CodePipeline",
+        "Elastic Beanstalk",
+        "CloudWatch",
+        "AWS Shield",
+        "AWS WAF",
+        "Route 53",
+        "Load balancer",
+        "Lambda",
+        "ECR",
+        "CloudFront"
+      ]
+    }
+  },
+  "Security": {
+    "Basics": {
+      "keywords": [
+        "Principle of least privilege",
+        "Authentication / Authorization",
+        "Asymmetric vs Symmetric Encryption",
+        "SSH Keys",
+        "SSH Security Configurations",
+        "Access Token",
+        "SSO",
+        "OAuth2",
+        "OIDC",
+        "Opaque Tokens",
+        "JWT Tokens",
+        "AWS Identity/Resource-Based Policies",
+        "RBAC / ABAC"
+      ]
+    },
+    "SSL": {
+      "keywords": [
+        "SSL / TLS",
+        "Handshake Process",
+        "SAN (Subject Alternative Name)",
+        "SSL Certificate types",
+        "Private / Public CA ",
+        "SSL Validation",
+        "SSL Validation Levels",
+        "Certificate Chain",
+        "Code Signing Certificates",
+        "Digital Signatures",
+        "Expiration and Renewal",
+        "CRL",
+        "OCSP",
+        "PFS (Perfect Forward Secrecy)",
+        "Man-in-the-Middle (MitM)"
+      ]
+    }
+  },
+  "DevOps": {
+    "Basics": {
+      "keywords": [
+        "DevOps",
+        "SDLC",
+        "DevOps Lifecycle",
+        "Waterfall methodology",
+        "Agile methodology",
+        "SRE",
+        "SysOps",
+        "DevSecOps",
+        "Version control",
+        "Build automation",
+        "Configuration management",
+        "Infrastructure as code",
+        "Orchestration",
+        "Continuous monitoring",
+        "Microservices",
+        "Shift left"
+      ]
+    },
+    "CI/CD": {
+      "keywords": [
+        "Continuous Integration (CI)",
+        "Pipeline",
+        "Pipeline stages",
+        "Build server / CI server",
+        "Pipeline as code",
+        "Continuous Testing",
+        "Continuous Delivery / Continuous Deployment (CD)",
+        "Automated Deployment",
+        "Deployment Strategies"
+      ]
+    }
+  },
+  "IaC": {
+    "Ansible": {
+      "keywords": [
+        "Control node",
+        "Managed node",
+        "Host inventory",
+        "/etc/ansible/ansible.cfg",
+        "Ad hoc commands",
+        "Playbook",
+        "Task",
+        "Terraform Modules",
+        "Idempotence",
+        "Role",
+        "Block",
+        "Templates",
+        "Handlers",
+        "Strategy",
+        "Ansible debugger"
+      ]
+    },
+    "Terraform Basics": {
+      "keywords": [
+        "Terraform",
+        "Immutable infrastructure paradigm",
+        "Providers",
+        "Resources",
+        "HCL",
+        "Terraform configuration",
+        "State file",
+        "Terraform backend",
+        "Tainted resource",
+        "Terraform variables",
+        "Default values",
+        "Output values",
+        "Local values",
+        "Validation block",
+        "count and for_each",
+        "Conditional Expressions",
+        "Terraform Modules",
+        "Data sources",
+        "Dynamic blocks",
+        "Provisioners",
+        "local-exec",
+        "remote-exec",
+        "Terraform Registry"
+      ]
+    },
+    "Terraform Commands": {
+      "keywords": [
+        "plan",
+        "init",
+        "validate",
+        "show",
+        "destroy",
+        "apply",
+        "fmt",
+        "state list"
+      ]
+    }
+  }
+}

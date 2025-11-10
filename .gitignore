@@ -1,0 +1,11 @@
+# Application repo ignores
+venv/
+__pycache__/
+.env
+node_modules/
+.idea/
+dist/
+
+# Terraform caches if present
+.terraform/
+*.tfstate

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DevOps Quiz Question</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+<div class="container">
+    <h1>DevOps Quiz Question</h1>
+    {% if question %}
+        <div class="feedback">
+            <strong>Keyword:</strong> {{ keyword }}<br>
+            <strong>Question:</strong> {{ question }}<br>
+        </div>
+        <form method="POST">
+            <label for="answer">Your answer:</label>
+            <input type="text" name="answer" id="answer" value="{{ answer or '' }}" autocomplete="off">
+            
+            <div class="button-row">
+                <button type="submit" name="action" value="ask_again">Go Back</button>
+                <button type="submit" name="action" value="submit">Submit Answer</button>
+            </div>
+        </form>
+    {% else %}
+        <div class="feedback">
+            No question generated. Please go back and generate a question.
+        </div>
+        <form method="POST">
+            <button type="submit" name="action" value="ask_again">Go Back</button>
+        </form>
+    {% endif %}
+    
+    {% if feedback %}
+        <div class="feedback">
+            <strong>Feedback:</strong><br>
+            {{ feedback | safe }}
+        </div>
+    {% endif %}
+</div>
+</body>
+</html>

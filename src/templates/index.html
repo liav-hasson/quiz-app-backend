@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DevOps Quiz App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+<div class="container">
+    <h1>DevOps Quiz App</h1>
+
+    {% if feedback and not question %}
+        <!-- Show feedback only after answer submission -->
+        <div class="feedback">
+            <strong>Feedback:</strong><br>
+            {{ feedback | safe }}
+        </div>
+        <form method="POST">
+            <button type="submit" name="action" value="ask_again">Ask Again</button>
+        </form>
+    {% else %}
+        <form method="POST">
+            <label for="category">Category:</label>
+            <select name="category" id="category" onchange="this.form.submit()">
+                <option value="">-- Select Category --</option>
+                {% for cat in categories %}
+                    <option value="{{ cat }}" {% if cat == selected_category %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="subject">Subject:</label>
+            <select name="subject" id="subject" onchange="this.form.submit()">
+                <option value="">-- Select Subject --</option>
+                {% for subj in subjects %}
+                    <option value="{{ subj }}" {% if subj == selected_subject %}selected{% endif %}>{{ subj }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="difficulty">Difficulty:</label>
+            <select name="difficulty" id="difficulty" onchange="this.form.submit()">
+                <option value="">-- Select Difficulty --</option>
+                {% for diff in [1, 2, 3] %}
+                    <option value="{{ diff }}" {% if diff|string == difficulty %}selected{% endif %}>{{ diff }}</option>
+                {% endfor %}
+            </select>
+
+            <div class="button-row">
+                <button type="submit" name="action" value="reset">Reset Fields</button>
+                {% if selected_category and selected_subject and difficulty %}
+                    <button type="submit" name="action" value="generate">Generate Question</button>
+                {% else %}
+                    <button type="button" disabled>Generate Question</button>
+                {% endif %}
+            </div>
+
+            {% if question %}
+                <hr>
+                <div class="question-row">
+                    <div class="feedback">
+                        <strong>Keyword:</strong> {{ keyword }}<br>
+                        <strong>Question:</strong> {{ question }}<br>
+                    </div>
+                    <div class="answer-form">
+                        <label for="answer">Your answer:</label>
+                        <input type="text" name="answer" id="answer" value="{{ answer or '' }}" autocomplete="off">
+                        <button type="submit" name="action" value="submit">Submit Answer</button>
+                    </div>
+                </div>
+            {% endif %}
+        </form>
+    {% endif %}
+
+    {% if feedback and question %}
+        <!-- Optional: feedback for other stages -->
+        <div class="feedback">
+            <strong>Feedback:</strong><br>
+            {{ feedback | safe }}
+        </div>
+    {% endif %}
+</div>
+</body>
+</html>
