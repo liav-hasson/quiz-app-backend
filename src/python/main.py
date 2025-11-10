@@ -1,148 +1,113 @@
-"""Quiz app Flask entrypoint.
+"""Quiz app Flask REST API.
 
-This module starts the Flask app for local development. In production the
-application should be run under a WSGI server (gunicorn/uwsgi) and not via
-``app.run()`` with ``debug=True`` or binding to all interfaces.
+Simple REST API for quiz app. Designed to be stateless and serve a React frontend.
+In production, run under a WSGI server (gunicorn/uwsgi).
 """
 
 import os
-from flask import Flask, render_template, request, session, redirect, url_for
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from quiz_utils import get_categories, get_subjects, get_random_keyword
 from ai_utils import generate_question, evaluate_answer
 
-app = Flask(
-    __name__,
-    static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static')),
-    template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
-)
-app.secret_key = os.environ.get('SECRET_KEY', 'devops-quiz-secret-key')
+app = Flask(__name__)
+CORS(app)  # Enable CORS for React frontend
 
 
-# --- Helper function to reset session ---
-def reset_session(full=True):
-    """Clear session data.
+@app.route('/api/health', methods=['GET'])
+def health():
+    """Health check endpoint."""
+    return jsonify({'status': 'ok'})
 
-    Args:
-        full: If True, reset everything. If False, keep category/subject/difficulty.
-    """
-    if full:
-        session.clear()
-    else:
-        # Keep the selection but reset question-related data
-        session.pop('question', None)
-        session.pop('answer', None)
-        session.pop('keyword', None)
-        session.pop('feedback', None)
 
-# --- Main index page (select category/subject/difficulty) ---
-@app.route('/', methods=["GET", "POST"])
-def index():
-    """Render the main page for category/subject/difficulty selection."""
+@app.route('/api/categories', methods=['GET'])
+def api_categories():
+    """Get all available categories."""
     categories = get_categories()
-    feedback = session.pop('feedback', None)  # Get and remove feedback from session
-
-    if request.method == "POST":
-        action = request.form.get("action")
-
-        if action == "reset":
-            reset_session(full=True)
-            return redirect(url_for('index'))
-
-        # Update session from form data
-        if 'category' in request.form:
-            new_category = request.form['category'] or None
-            if new_category != session.get('selected_category'):
-                # Reset subject when category changes
-                session.pop('selected_subject', None)
-            session['selected_category'] = new_category
-        if 'subject' in request.form:
-            session['selected_subject'] = request.form['subject'] or None
-        if 'difficulty' in request.form:
-            session['difficulty'] = request.form['difficulty'] or None
-
-        if action == "generate":
-            if not session.get("difficulty"):
-                feedback = "Please select a difficulty before generating a question."
-            elif session.get('selected_category') and session.get('selected_subject'):
-                session['keyword'] = get_random_keyword(
-                    session['selected_category'],
-                    session['selected_subject']
-                )
-                session['question'] = generate_question(
-                    session['selected_category'],
-                    session['keyword'],
-                    int(session['difficulty'])
-                )
-                return redirect(url_for('question_page'))
-
-    subjects = (get_subjects(session.get('selected_category'))
-                if session.get('selected_category') else [])
-
-    return render_template(
-        "index.html",
-        categories=categories,
-        subjects=subjects,
-        selected_category=session.get('selected_category'),
-        selected_subject=session.get('selected_subject'),
-        difficulty=session.get('difficulty'),
-        feedback=feedback
-    )
+    return jsonify({'categories': categories})
 
 
-# --- Question page (answer & feedback) ---
-@app.route('/question', methods=["GET", "POST"])
-def question_page():
-    """Render the question page and handle answer submission."""
-    # Check if we have a question, if not redirect to index
-    if not session.get('question'):
-        return redirect(url_for('index'))
+@app.route('/api/subjects', methods=['GET'])
+def api_subjects():
+    """Get subjects for a specific category."""
+    category = request.args.get('category')
+    if not category:
+        return jsonify({'error': 'category parameter required'}), 400
+    
+    subjects = get_subjects(category)
+    return jsonify({'subjects': subjects})
 
-    feedback = None
-    question = session.get('question')
-    keyword = session.get('keyword')
-    difficulty = session.get('difficulty')
 
-    if request.method == "POST":
-        action = request.form.get("action")
-        answer = request.form.get("answer")
+@app.route('/api/question/generate', methods=['POST'])
+def api_generate_question():
+    """Generate a question based on category, subject, and difficulty."""
+    data = request.get_json()
+    
+    category = data.get('category')
+    subject = data.get('subject')
+    difficulty = data.get('difficulty')
+    
+    if not all([category, subject, difficulty]):
+        return jsonify({
+            'error': 'category, subject, and difficulty are required'
+        }), 400
+    
+    try:
+        difficulty = int(difficulty)
+        if difficulty not in [1, 2, 3]:
+            raise ValueError()
+    except (ValueError, TypeError):
+        return jsonify({'error': 'difficulty must be 1, 2, or 3'}), 400
+    
+    keyword = get_random_keyword(category, subject)
+    if not keyword:
+        return jsonify({'error': 'No keywords found for this category/subject'}), 404
+    
+    question = generate_question(category, keyword, difficulty)
+    
+    return jsonify({
+        'question': question,
+        'keyword': keyword,
+        'category': category,
+        'subject': subject,
+        'difficulty': difficulty
+    })
 
-        if action == "submit":
-            if not answer or not answer.strip():
-                feedback = "Please enter an answer before submitting."
-            else:
-                feedback = evaluate_answer(question, answer, int(difficulty))
-                # Store feedback in session to persist across page refreshes
-                session['feedback'] = feedback
-        elif action == "ask_again":
-            reset_session(full=False)
-            return redirect(url_for('index'))
 
-        elif action == "reset":
-            reset_session(full=True)
-            return redirect(url_for('index'))
-
-    # Get feedback from session if it exists (for both GET and POST requests)
-    # Get feedback from session if it exists (for both GET and POST requests)
-    feedback = session.get('feedback', feedback)
-
-    return render_template(
-        "question.html",
-        question=question,
-        keyword=keyword,
-        difficulty=difficulty,
-        feedback=feedback
-    )
+@app.route('/api/answer/evaluate', methods=['POST'])
+def api_evaluate_answer():
+    """Evaluate an answer to a question."""
+    data = request.get_json()
+    
+    question = data.get('question')
+    answer = data.get('answer')
+    difficulty = data.get('difficulty')
+    
+    if not all([question, answer, difficulty]):
+        return jsonify({
+            'error': 'question, answer, and difficulty are required'
+        }), 400
+    
+    try:
+        difficulty = int(difficulty)
+        if difficulty not in [1, 2, 3]:
+            raise ValueError()
+    except (ValueError, TypeError):
+        return jsonify({'error': 'difficulty must be 1, 2, or 3'}), 400
+    
+    feedback = evaluate_answer(question, answer, difficulty)
+    
+    return jsonify({'feedback': feedback})
 
 
 if __name__ == "__main__":
-    # Don't run in debug mode or bind to 0.0.0.0 by default in production.
-    # Use environment variables to control runtime behavior for local testing.
     debug_env = os.environ.get("FLASK_DEBUG", "false").lower()
     debug = debug_env in ("1", "true", "yes")
-    host = os.environ.get("FLASK_HOST", "127.0.0.1")
+    host = os.environ.get("FLASK_HOST", "0.0.0.0")
+    
     try:
-        PORT = int(os.environ.get("FLASK_PORT", 5000))
+        port = int(os.environ.get("FLASK_PORT", 5000))
     except (TypeError, ValueError):
-        PORT = 5000
-
-    app.run(debug=debug, host=host, port=PORT)
+        port = 5000
+    
+    app.run(debug=debug, host=host, port=port)

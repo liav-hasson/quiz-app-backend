@@ -1,11 +1,24 @@
-# Application repo ignores
-venv/
+# Python
 __pycache__/
-.env
-node_modules/
-.idea/
-dist/
+*.py[cod]
+*.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
 
-# Terraform caches if present
-.terraform/
-*.tfstate
+# Flask
+instance/
+.webassets-cache
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
