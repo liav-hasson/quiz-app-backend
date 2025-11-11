@@ -50,12 +50,23 @@ pipeline {
         
         // GitOps Configuration
         // GitHub repository for this application
-        GITHUB_REPO           = "liav-hasson/Leumi-project"
+        GITHUB_REPO           = "liav-hasson/quiz-app-backend"
         GITHUB_REPO_URL       = "https://github.com/${GITHUB_REPO}.git"
         
         // Git configuration for commits
         GIT_USER_NAME         = "Jenkins Pipeline"
         GIT_USER_EMAIL        = "jenkins@weatherlabs.org"
+
+        // Application layout
+        APP_DIR               = "src"
+        PYTHON_SRC_DIR        = "src/python"
+        REQUIREMENTS_FILE     = "src/requirements.txt"
+
+        // Docker image name without registry/user prefix (application)
+        DOCKER_IMAGE_NAME     = "quiz-app"
+
+        // CI resources directory
+        CI_DIR                = "ci"
     }
 
     stages {
@@ -69,7 +80,7 @@ pipeline {
                     env.IMAGE_TAG = env.BUILD_TAG
 
                     // Compute semantic version and set env for the rest of pipeline
-                    def semver = sh(returnStdout: true, script: './quiz-app/src/scripts/compute_next_version.sh ./quiz-app auto').trim()
+                    def semver = sh(returnStdout: true, script: './scripts/compute_next_version.sh . auto').trim()
                     if (semver) {
                         echo "Computed semantic version: ${semver}"
                         env.IMAGE_TAG = semver
@@ -92,9 +103,9 @@ pipeline {
                 echo '--------- Starting checkout and testing ---------'
 
                 echo '--------- Running pylint test ---------'
-                sh 'pylint quiz-app/src/python/main.py --score=yes --fail-under=5.0'
-                sh 'pylint quiz-app/src/python/quiz_utils.py --score=yes --fail-under=5.0'
-                sh 'pylint quiz-app/src/python/ai_utils.py --score=yes --fail-under=5.0'
+                sh "pylint ${env.PYTHON_SRC_DIR}/main.py --score=yes --fail-under=5.0"
+                sh "pylint ${env.PYTHON_SRC_DIR}/quiz_utils.py --score=yes --fail-under=5.0"
+                sh "pylint ${env.PYTHON_SRC_DIR}/ai_utils.py --score=yes --fail-under=5.0"
                 echo 'Pylint checks passed!'
 
                 echo '--------- Skipping unit tests (no tests directory) ---------'
@@ -105,11 +116,11 @@ pipeline {
                     # Run safety check on production dependencies only
                     # Focus on src/requirements.txt (production dependencies)
                     # Exit code 64 means vulnerabilities found, 0 means clean
-                    safety check --json --file quiz-app/src/requirements.txt || {
+                    safety check --json --file "${REQUIREMENTS_FILE}" || {
                         if [ $? -eq 64 ]; then
                             echo "CRITICAL: Vulnerabilities found in production dependencies!"
-                            echo "Pipeline failed due to security vulnerabilities in quiz-app/src/requirements.txt"
-                            safety check --file quiz-app/src/requirements.txt --output text
+                            echo "Pipeline failed due to security vulnerabilities in $REQUIREMENTS_FILE"
+                            safety check --file "${REQUIREMENTS_FILE}" --output text
                             exit 1
                         else
                             echo "Safety check failed with unexpected error"
@@ -134,11 +145,11 @@ pipeline {
                 sh '''
                     # Run Bandit security analysis on Python source code
                     echo "Scanning Python code with Bandit..."
-                    bandit -r quiz-app/src/python/ -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
+                    bandit -r "${PYTHON_SRC_DIR}" -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
                     
                     # Display results in human-readable format  
                     echo "Bandit scan results:"
-                    bandit -r quiz-app/src/python/ -f txt || true
+                    bandit -r "${PYTHON_SRC_DIR}" -f txt || true
                     
                     # Check if high/medium severity issues found (exit codes 1-2)
                     if [ "${BANDIT_EXIT_CODE:-0}" -eq 1 ] || [ "${BANDIT_EXIT_CODE:-0}" -eq 2 ]; then
@@ -170,11 +181,11 @@ pipeline {
                     # Run Hadolint security scan on Dockerfile
                     # Check for security issues, best practices, and compliance
                     echo "Scanning Dockerfile with Hadolint..."
-                    hadolint --format json quiz-app/Dockerfile > hadolint-report.json || HADOLINT_EXIT_CODE=$?
+                    hadolint --format json ${CI_DIR}/app-dockerfile/Dockerfile > hadolint-report.json || HADOLINT_EXIT_CODE=$?
                     
                     # Display results in human-readable format
                     echo "Hadolint scan results:"
-                    hadolint quiz-app/Dockerfile || true
+                    hadolint ${CI_DIR}/app-dockerfile/Dockerfile || true
                     
                     # Check if critical/error level issues found
                     if [ "${HADOLINT_EXIT_CODE:-0}" -ne 0 ]; then
@@ -206,14 +217,14 @@ pipeline {
                         echo "Connecting to BuildKit DaemonSet..."
                         export BUILDKIT_HOST=tcp://buildkitd.jenkins.svc.cluster.local:1234
 
-                        echo "Building quiz-app image with buildctl..."
+                        echo "Building ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG} with buildctl..."
                         buildctl --addr ${BUILDKIT_HOST} build \
                             --frontend dockerfile.v0 \
-                            --local context=quiz-app \
-                            --local dockerfile=quiz-app \
-                            --output type=image,name=${DOCKERHUB_CREDENTIALS_USR}/quiz-app:${IMAGE_TAG},push=true
-                        
-                        echo "Image ${DOCKERHUB_CREDENTIALS_USR}/quiz-app:${IMAGE_TAG} built and pushed"
+                            --local context=. \
+                            --local dockerfile=${CI_DIR}/app-dockerfile \
+                            --output type=image,name=${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG},push=true
+
+                        echo "Image ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG} built and pushed"
                     '''
                 }
             }
@@ -240,8 +251,9 @@ pipeline {
                             git config --global credential.helper store
                             echo "https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com" > ~/.git-credentials
                             
-                            ./quiz-app/src/scripts/update-gitops.sh \
+                            ./scripts/update-gitops.sh \
                                 "${DOCKERHUB_CREDENTIALS_USR}" \
+                                "${DOCKER_IMAGE_NAME}" \
                                 "${IMAGE_TAG}" \
                                 "${BUILD_NUMBER}" \
                                 "${GITHUB_REPO_URL}" \
@@ -281,7 +293,7 @@ pipeline {
                 def finalMessage = [
                     "${statusIcon} GitOps Pipeline *${env.JOB_NAME}* #${env.BUILD_NUMBER} ${env.PIPELINE_STATUS}",
                     "",
-                    "*Docker Image:* ${env.DOCKERHUB_CREDENTIALS_USR}/quiz-app:${env.IMAGE_TAG}",
+                    "*Docker Image:* ${env.DOCKERHUB_CREDENTIALS_USR}/${env.DOCKER_IMAGE_NAME}:${env.IMAGE_TAG}",
                     "*GitOps Repo:* GitHub repository updated",
                     "*Deployment:* ArgoCD will sync automatically", 
                     "${slackMessage}"
