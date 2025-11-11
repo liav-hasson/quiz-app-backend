@@ -4,7 +4,18 @@ from typing import Optional, Dict, Any, List
 
 
 class DBController:
-    def __init__(self, host="localhost", port=27017, db_name="quizapp"):
+    def __init__(self, host="mongodb.mongodb.svc.cluster.local", port=27017, db_name="quizdb"):
+        """
+        Initialize MongoDB connection
+        
+        Args:
+            host: MongoDB hostname (default: Kubernetes service DNS)
+            port: MongoDB port (default: 27017)
+            db_name: Database name (default: quizdb)
+        
+        Note: In Kubernetes, use mongodb.mongodb.svc.cluster.local
+              For local development, use localhost
+        """
         self.host = host
         self.port = port
         self.db_name = db_name
@@ -443,7 +454,7 @@ if __name__ == "__main__":
 
         try:
             # MIGRATION EXAMPLE: Import from your existing db.json
-            json_file_path = "/home/l33t/projects/quizapp/src/db/db.json"
+            json_file_path = "./db.json"
             print("Migrating data from JSON to MongoDB...")
             if migrator.migrate_from_json_file(json_file_path):
                 print("✅ Migration successful!")
