@@ -91,32 +91,34 @@ echo "Pushing changes to GitHub..."
 # Go back to repo root for git operations
 cd "$TEMP_DIR"
 
+# Debug: Check if credentials are provided
+if [ -z "$GITHUB_USERNAME" ]; then
+    echo "ERROR: GITHUB_USERNAME is empty!"
+fi
+if [ -z "$GITHUB_PASSWORD" ]; then
+    echo "ERROR: GITHUB_PASSWORD is empty!"
+fi
+
 # Use the authenticated remote URL for push
 if [ -n "$GITHUB_USERNAME" ] && [ -n "$GITHUB_PASSWORD" ]; then
-    echo "Setting up authenticated push..."
+    echo "Setting up authenticated push with username: ${GITHUB_USERNAME}"
     REPO_PATH=$(echo "$GITOPS_REPO_URL" | sed 's|https://||')
+    echo "Repository path: ${REPO_PATH}"
     AUTHENTICATED_URL="https://${GITHUB_USERNAME}:${GITHUB_PASSWORD}@${REPO_PATH}"
     
     # Set the remote URL with authentication
     git remote set-url origin "$AUTHENTICATED_URL"
     
-    # Alternative: use git config for credentials
-    git config credential.helper store
-    echo "https://${GITHUB_USERNAME}:${GITHUB_PASSWORD}@github.com" > ~/.git-credentials
-    chmod 600 ~/.git-credentials
+    # Verify the remote was set (mask credentials in output)
+    echo "Current remote URL:"
+    git remote -v | sed "s/${GITHUB_PASSWORD}/***MASKED***/g"
     
-    echo "Remote URL updated (credentials masked)"
+    echo "Remote URL updated successfully"
 else
     echo "WARNING: No GitHub credentials provided, push may fail!"
 fi
 
 git push origin main
-
-# Clean up credentials
-if [ -n "$GITHUB_USERNAME" ] && [ -n "$GITHUB_PASSWORD" ]; then
-    rm -f ~/.git-credentials
-    git config --unset credential.helper
-fi
 
 # Tag the release version for next build's version calculation
 echo "--------- Tagging release version ---------"

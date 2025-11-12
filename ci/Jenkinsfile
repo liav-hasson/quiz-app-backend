@@ -259,12 +259,11 @@ pipeline {
             steps {
                 echo '--------- Updating GitOps Repository ---------'
                 script {
-                    // Configure git credentials securely using credential helper
-                    withCredentials([usernamePassword(credentialsId: 'github-credentials', 
-                                                      usernameVariable: 'GIT_USERNAME', 
-                                                      passwordVariable: 'GIT_PASSWORD')]) {
+                    // Use GitHub token for authentication
+                    withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_PAT')]) {
                         sh '''
                             # Pass credentials to the script directly
+                            # For PAT, use x-access-token as username (GitHub convention)
                             ./scripts/update-gitops.sh \
                                 "${DOCKERHUB_CREDENTIALS_USR}" \
                                 "${DOCKER_IMAGE_NAME}" \
@@ -273,8 +272,8 @@ pipeline {
                                 "${GITOPS_REPO_URL}" \
                                 "${GIT_USER_NAME}" \
                                 "${GIT_USER_EMAIL}" \
-                                "${GIT_USERNAME}" \
-                                "${GIT_PASSWORD}"
+                                "x-access-token" \
+                                "${GITHUB_PAT}"
                         '''
                     }
                 }
