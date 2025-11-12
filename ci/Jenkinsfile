@@ -264,10 +264,7 @@ pipeline {
                                                       usernameVariable: 'GIT_USERNAME', 
                                                       passwordVariable: 'GIT_PASSWORD')]) {
                         sh '''
-                            git config --global credential.helper store
-                            echo "https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com" > ~/.git-credentials
-                            cat ~/.git-credentials
-                            
+                            # Pass credentials to the script directly
                             ./scripts/update-gitops.sh \
                                 "${DOCKERHUB_CREDENTIALS_USR}" \
                                 "${DOCKER_IMAGE_NAME}" \
@@ -275,10 +272,9 @@ pipeline {
                                 "${BUILD_NUMBER}" \
                                 "${GITOPS_REPO_URL}" \
                                 "${GIT_USER_NAME}" \
-                                "${GIT_USER_EMAIL}"
-                            
-                            rm -f ~/.git-credentials
-                            git config --global --unset credential.helper
+                                "${GIT_USER_EMAIL}" \
+                                "${GIT_USERNAME}" \
+                                "${GIT_PASSWORD}"
                         '''
                     }
                 }
