@@ -73,6 +73,7 @@ git commit -m "Deploy ${DOCKER_IMAGE_NAME}:${IMAGE_TAG}
 }
 
 echo "Pushing changes to GitHub..."
+git config credential.helper store
 git push origin main
 
 # Tag the release version for next build's version calculation
