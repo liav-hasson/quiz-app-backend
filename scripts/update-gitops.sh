@@ -88,20 +88,20 @@ git commit -m "Deploy ${DOCKER_IMAGE_NAME}:${IMAGE_TAG}
 }
 
 echo "Pushing changes to GitHub..."
+# Go back to repo root for git operations
+cd "$TEMP_DIR"
+
 # Use the authenticated remote URL for push
 if [ -n "$GITHUB_USERNAME" ] && [ -n "$GITHUB_PASSWORD" ]; then
     REPO_PATH=$(echo "$GITOPS_REPO_URL" | sed 's|https://||')
     AUTHENTICATED_URL="https://${GITHUB_USERNAME}:${GITHUB_PASSWORD}@${REPO_PATH}"
-
     git remote set-url origin "$AUTHENTICATED_URL"
 fi
 
 git push origin main
 
-
 # Tag the release version for next build's version calculation
 echo "--------- Tagging release version ---------"
-cd "$TEMP_DIR"
 git tag -a "${IMAGE_TAG}" -m "Release ${DOCKER_IMAGE_NAME} ${IMAGE_TAG} - Build #${BUILD_NUMBER:-unknown}" 2>/dev/null || {
     echo "Tag ${IMAGE_TAG} already exists, skipping tag creation"
 }
