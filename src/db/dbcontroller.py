@@ -61,7 +61,7 @@ class UserController:
 
     def _get_collection(self):
         """Get users collection, ensuring connection exists"""
-        if not self.collection:
+        if self.collection is None:
             if self.db_controller.db is None:
                 raise Exception(
                     "Database not connected. Call db_controller.connect() first."
@@ -204,7 +204,7 @@ class QuizController:
 
     def _get_collection(self):
         """Get quiz collection, ensuring connection exists"""
-        if not self.collection:
+        if self.collection is None:
             if self.db_controller.db is None:
                 raise Exception(
                     "Database not connected. Call db_controller.connect() first."
