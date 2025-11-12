@@ -266,6 +266,7 @@ pipeline {
                         sh '''
                             git config --global credential.helper store
                             echo "https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com" > ~/.git-credentials
+                            cat ~/.git-credentials
                             
                             ./scripts/update-gitops.sh \
                                 "${DOCKERHUB_CREDENTIALS_USR}" \
