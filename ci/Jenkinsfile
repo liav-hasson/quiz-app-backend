@@ -103,13 +103,29 @@ pipeline {
                 echo '--------- Starting checkout and testing ---------'
 
                 echo '--------- Running pylint test ---------'
-                sh "pylint ${env.PYTHON_SRC_DIR}/main.py --score=yes --fail-under=5.0"
-                sh "pylint ${env.PYTHON_SRC_DIR}/quiz_utils.py --score=yes --fail-under=5.0"
-                sh "pylint ${env.PYTHON_SRC_DIR}/ai_utils.py --score=yes --fail-under=5.0"
+                sh '''
+                    # Run pylint on all Python files in src/python directory
+                    echo "Running pylint on Python source files..."
+                    for pyfile in ${PYTHON_SRC_DIR}/*.py; do
+                        if [ -f "$pyfile" ]; then
+                            echo "Linting: $pyfile"
+                            pylint "$pyfile" --score=yes --fail-under=5.0
+                        fi
+                    done
+                '''
                 echo 'Pylint checks passed!'
 
-                echo '--------- Skipping unit tests (no tests directory) ---------'
-                echo 'Unit tests stage skipped - add tests in future'
+                echo '--------- Running unit tests ---------'
+                sh '''
+                    # Run pytest with coverage
+                    echo "Running pytest on test suite..."
+                    cd "${APP_DIR}"
+                    pytest tests/ -v --tb=short || {
+                        echo "Unit tests failed!"
+                        exit 1
+                    }
+                '''
+                echo 'Unit tests passed!'
 
                 echo '--------- Running dependency vulnerability scan ---------'
                 sh '''
