@@ -93,12 +93,30 @@ cd "$TEMP_DIR"
 
 # Use the authenticated remote URL for push
 if [ -n "$GITHUB_USERNAME" ] && [ -n "$GITHUB_PASSWORD" ]; then
+    echo "Setting up authenticated push..."
     REPO_PATH=$(echo "$GITOPS_REPO_URL" | sed 's|https://||')
     AUTHENTICATED_URL="https://${GITHUB_USERNAME}:${GITHUB_PASSWORD}@${REPO_PATH}"
+    
+    # Set the remote URL with authentication
     git remote set-url origin "$AUTHENTICATED_URL"
+    
+    # Alternative: use git config for credentials
+    git config credential.helper store
+    echo "https://${GITHUB_USERNAME}:${GITHUB_PASSWORD}@github.com" > ~/.git-credentials
+    chmod 600 ~/.git-credentials
+    
+    echo "Remote URL updated (credentials masked)"
+else
+    echo "WARNING: No GitHub credentials provided, push may fail!"
 fi
 
 git push origin main
+
+# Clean up credentials
+if [ -n "$GITHUB_USERNAME" ] && [ -n "$GITHUB_PASSWORD" ]; then
+    rm -f ~/.git-credentials
+    git config --unset credential.helper
+fi
 
 # Tag the release version for next build's version calculation
 echo "--------- Tagging release version ---------"
