@@ -264,13 +264,16 @@ pipeline {
                                                       usernameVariable: 'GIT_USERNAME', 
                                                       passwordVariable: 'GIT_PASSWORD')]) {
                         sh '''
-                            # Test if the token has access to the gitops repo
-                            echo "Testing GitHub API access..."
-                            curl -s -H "Authorization: token ${GIT_PASSWORD}" \
-                                https://api.github.com/repos/liav-hasson/quiz-app-gitops | head -20
+                            # Use GIT_ASKPASS to provide credentials
+                            echo '#!/bin/sh' > /tmp/git-askpass.sh
+                            echo 'echo "$GIT_PASSWORD"' >> /tmp/git-askpass.sh
+                            chmod +x /tmp/git-askpass.sh
+                            
+                            export GIT_ASKPASS=/tmp/git-askpass.sh
+                            export GIT_USERNAME
+                            export GIT_PASSWORD
                             
                             # Pass credentials to the script directly
-                            # Use the actual GitHub username from the credential
                             ./scripts/update-gitops.sh \
                                 "${DOCKERHUB_CREDENTIALS_USR}" \
                                 "${DOCKER_IMAGE_NAME}" \
@@ -281,6 +284,8 @@ pipeline {
                                 "${GIT_USER_EMAIL}" \
                                 "${GIT_USERNAME}" \
                                 "${GIT_PASSWORD}"
+                            
+                            rm -f /tmp/git-askpass.sh
                         '''
                     }
                 }
