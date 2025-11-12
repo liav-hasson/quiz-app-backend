@@ -264,16 +264,6 @@ pipeline {
                                                       usernameVariable: 'GIT_USERNAME', 
                                                       passwordVariable: 'GIT_PASSWORD')]) {
                         sh '''
-                            # Use GIT_ASKPASS to provide credentials
-                            echo '#!/bin/sh' > /tmp/git-askpass.sh
-                            echo 'echo "$GIT_PASSWORD"' >> /tmp/git-askpass.sh
-                            chmod +x /tmp/git-askpass.sh
-                            
-                            export GIT_ASKPASS=/tmp/git-askpass.sh
-                            export GIT_USERNAME
-                            export GIT_PASSWORD
-                            
-                            # Pass credentials to the script directly
                             ./scripts/update-gitops.sh \
                                 "${DOCKERHUB_CREDENTIALS_USR}" \
                                 "${DOCKER_IMAGE_NAME}" \
@@ -284,8 +274,6 @@ pipeline {
                                 "${GIT_USER_EMAIL}" \
                                 "${GIT_USERNAME}" \
                                 "${GIT_PASSWORD}"
-                            
-                            rm -f /tmp/git-askpass.sh
                         '''
                     }
                 }

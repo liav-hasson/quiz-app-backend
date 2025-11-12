@@ -91,52 +91,20 @@ echo "Pushing changes to GitHub..."
 # Go back to repo root for git operations
 cd "$TEMP_DIR"
 
-# Debug: Check if credentials are provided
-if [ -z "$GITHUB_USERNAME" ]; then
-    echo "ERROR: GITHUB_USERNAME is empty!"
-fi
-if [ -z "$GITHUB_PASSWORD" ]; then
-    echo "ERROR: GITHUB_PASSWORD is empty!"
-fi
-
 # Use the authenticated remote URL for push
 if [ -n "$GITHUB_USERNAME" ] && [ -n "$GITHUB_PASSWORD" ]; then
-    echo "Setting up authenticated push with username: ${GITHUB_USERNAME}"
     REPO_PATH=$(echo "$GITOPS_REPO_URL" | sed 's|https://||')
-    echo "Repository path: ${REPO_PATH}"
     AUTHENTICATED_URL="https://${GITHUB_USERNAME}:${GITHUB_PASSWORD}@${REPO_PATH}"
-    
-    # Disable credential helpers to avoid cached credentials
-    git config --local credential.helper ""
-    git config --local --unset-all credential.helper || true
-    
-    # Set the remote URL with authentication
     git remote set-url origin "$AUTHENTICATED_URL"
-    
-    # Verify the remote was set (mask credentials in output)
-    echo "Current remote URL:"
-    git remote -v | sed "s/${GITHUB_PASSWORD}/***MASKED***/g"
-    
-    echo "Remote URL updated successfully"
-else
-    echo "WARNING: No GitHub credentials provided, push may fail!"
 fi
 
-# Use GIT_TERMINAL_PROMPT=0 to prevent any interactive prompts
-GIT_TERMINAL_PROMPT=0 git push origin main
+git push origin main
 
 # Tag the release version for next build's version calculation
 echo "--------- Tagging release version ---------"
 git tag -a "${IMAGE_TAG}" -m "Release ${DOCKER_IMAGE_NAME} ${IMAGE_TAG} - Build #${BUILD_NUMBER:-unknown}" 2>/dev/null || {
     echo "Tag ${IMAGE_TAG} already exists, skipping tag creation"
 }
-
-# Push the tag (use same authenticated remote if available)
-if [ -n "$GITHUB_USERNAME" ] && [ -n "$GITHUB_PASSWORD" ]; then
-    REPO_PATH=$(echo "$GITOPS_REPO_URL" | sed 's|https://||')
-    AUTHENTICATED_URL="https://${GITHUB_USERNAME}:${GITHUB_PASSWORD}@${REPO_PATH}"
-    git remote set-url origin "$AUTHENTICATED_URL"
-fi
 git push origin "${IMAGE_TAG}" 2>/dev/null || {
     echo "Tag ${IMAGE_TAG} already exists on remote, skipping tag push"
 }
