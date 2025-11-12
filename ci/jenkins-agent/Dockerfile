@@ -33,10 +33,15 @@ RUN apt-get update && \
 RUN python3 -m pip install --no-cache-dir --break-system-packages --upgrade --ignore-installed pip==24.3.1 setuptools==80.9.0 wheel==0.45.1 && \
     pip3 install --no-cache-dir --break-system-packages \
         pytest==8.4.2 \
+        pytest-cov==6.0.0 \
         pylint==3.3.6 \
         flask==3.1.1 \
+        flask-scss==0.5 \
+        flask-cors==5.0.0 \
         requests==2.32.4 \
-        flask-scss==0.5
+        pymongo==4.10.1 \
+        openai==1.59.5 \
+        boto3==1.35.93
 
 # -----------------------------
 # 2.5. Security tools for DevSecOps exercises

@@ -12,7 +12,7 @@ pipeline {
                 spec:
                   containers:
                     - name: jnlp
-                      image: liavvv/jenkins-agent:1.7
+                      image: liavvv/jenkins-agent:1.9
                       imagePullPolicy: Always
                       volumeMounts:
                         - name: workspace-volume
@@ -117,11 +117,8 @@ pipeline {
 
                 echo '--------- Running unit tests ---------'
                 sh '''
-                    # Install dependencies for testing
-                    echo "Installing dependencies from requirements.txt..."
-                    pip install --user -r "${REQUIREMENTS_FILE}"
-                    
                     # Run pytest with coverage
+                    # Dependencies are pre-installed in the agent Docker image
                     echo "Running pytest on test suite..."
                     cd "${APP_DIR}"
                     pytest tests/ -v --tb=short || {
