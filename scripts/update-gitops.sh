@@ -1,7 +1,7 @@
 #!/bin/bash
 # GitOps updater for quiz-app Helm chart
 # Updates image tag in values.yaml and appVersion in Chart.yaml
-# Commits changes back to the same GitHub repository
+# Commits changes back to the GitOps repository
 
 set -e
 
@@ -10,19 +10,19 @@ DOCKER_USERNAME="$1"
 DOCKER_IMAGE_NAME="$2"
 IMAGE_TAG="$3"
 BUILD_NUMBER="$4"
-GITHUB_REPO_URL="$5"
+GITOPS_REPO_URL="${5:-https://github.com/liav-hasson/quiz-app-gitops.git}"
 GIT_USER_NAME="$6"
 GIT_USER_EMAIL="$7"
 
 # Validation
-if [ -z "$DOCKER_USERNAME" ] || [ -z "$DOCKER_IMAGE_NAME" ] || [ -z "$IMAGE_TAG" ] || [ -z "$GITHUB_REPO_URL" ] || [ -z "$GIT_USER_NAME" ] || [ -z "$GIT_USER_EMAIL" ]; then
-    echo "Usage: $0 <docker_username> <docker_image_name> <image_tag> <build_number> <github_repo_url> <git_user_name> <git_user_email>"
+if [ -z "$DOCKER_USERNAME" ] || [ -z "$DOCKER_IMAGE_NAME" ] || [ -z "$IMAGE_TAG" ] || [ -z "$GITOPS_REPO_URL" ] || [ -z "$GIT_USER_NAME" ] || [ -z "$GIT_USER_EMAIL" ]; then
+    echo "Usage: $0 <docker_username> <docker_image_name> <image_tag> <build_number> <gitops_repo_url> <git_user_name> <git_user_email>"
     echo "ERROR: Missing required parameters:"
     echo "   DOCKER_USERNAME: '$DOCKER_USERNAME'"
     echo "   DOCKER_IMAGE_NAME: '$DOCKER_IMAGE_NAME'"
     echo "   IMAGE_TAG: '$IMAGE_TAG'"  
     echo "   BUILD_NUMBER: '$BUILD_NUMBER'"
-    echo "   GITHUB_REPO_URL: '$GITHUB_REPO_URL'"
+    echo "   GITOPS_REPO_URL: '$GITOPS_REPO_URL'"
     echo "   GIT_USER_NAME: '$GIT_USER_NAME'"
     echo "   GIT_USER_EMAIL: '$GIT_USER_EMAIL'"
     exit 1
@@ -35,18 +35,17 @@ echo "Image: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR"
 
-# Clone GitHub repo (shallow + sparse for efficiency)
-echo "--------- Cloning repository ---------"
-echo "   Repository: $GITHUB_REPO_URL"
+# Clone GitOps repo
+echo "--------- Cloning GitOps repository ---------"
+echo "   Repository: $GITOPS_REPO_URL"
 echo "   Git user: $GIT_USER_NAME <$GIT_USER_EMAIL>"
-git clone --depth=1 --filter=blob:none --sparse "$GITHUB_REPO_URL" .
-git sparse-checkout set gitops/quiz-backend
+git clone --depth=1 "$GITOPS_REPO_URL" .
 git config user.name "$GIT_USER_NAME"
 git config user.email "$GIT_USER_EMAIL"
 
 # Update Helm chart values
 echo "--------- Updating Helm chart ---------"
-cd gitops/quiz-backend
+cd quiz-backend
 
 # Update image repository and tag in values.yaml
 sed -i "s|repository: .*|repository: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}|g" values.yaml

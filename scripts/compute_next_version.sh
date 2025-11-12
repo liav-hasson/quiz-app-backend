@@ -20,10 +20,20 @@ MODE="${2:-patch}"
 
 cd "$REPO_DIR"
 
-# Helper: get latest semver tag (vMAJOR.MINOR.PATCH)
+# Helper: get latest semver tag from Docker Hub
 get_latest_tag() {
-  git fetch --tags --quiet || true
-  git describe --tags --match "v[0-9]*.[0-9]*.[0-9]*" --abbrev=0 2>/dev/null || true
+  DOCKER_USER="${DOCKERHUB_CREDENTIALS_USR:-}"
+  DOCKER_IMAGE="${DOCKER_IMAGE_NAME:-}"
+  
+  if [[ -n "$DOCKER_USER" ]] && [[ -n "$DOCKER_IMAGE" ]]; then
+    curl -s "https://hub.docker.com/v2/repositories/${DOCKER_USER}/${DOCKER_IMAGE}/tags?page_size=100" \
+      | grep -o '"name":"v[0-9]\+\.[0-9]\+\.[0-9]\+"' \
+      | cut -d'"' -f4 \
+      | sort -V \
+      | tail -n1 || echo "v0.0.0"
+  else
+    echo "v0.0.0"
+  fi
 }
 
 # Parse tag into MAJOR MINOR PATCH

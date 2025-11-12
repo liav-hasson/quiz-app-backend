@@ -53,6 +53,9 @@ pipeline {
         GITHUB_REPO           = "liav-hasson/quiz-app-backend"
         GITHUB_REPO_URL       = "https://github.com/${GITHUB_REPO}.git"
         
+        // GitOps repository (Helm charts)
+        GITOPS_REPO_URL       = "https://github.com/liav-hasson/quiz-app-gitops.git"
+        
         // Git configuration for commits
         GIT_USER_NAME         = "Jenkins Pipeline"
         GIT_USER_EMAIL        = "jenkins@weatherlabs.org"
@@ -76,16 +79,13 @@ pipeline {
                     echo '--------- Preparing image version ---------'
                     checkout scm
 
-                    // Default: use existing date-based BUILD_TAG
-                    env.IMAGE_TAG = env.BUILD_TAG
-
-                    // Compute semantic version and set env for the rest of pipeline
                     def semver = sh(returnStdout: true, script: './scripts/compute_next_version.sh . auto').trim()
                     if (semver) {
                         echo "Computed semantic version: ${semver}"
                         env.IMAGE_TAG = semver
                     } else {
-                        echo "No semantic version computed; falling back to date-based tag: ${env.IMAGE_TAG}"
+                        echo "No semantic version computed; falling back to date-based tag: ${env.BUILD_TAG}"
+                        env.IMAGE_TAG = env.BUILD_TAG
                     }
                 }
             }
@@ -273,7 +273,7 @@ pipeline {
                                 "${DOCKER_IMAGE_NAME}" \
                                 "${IMAGE_TAG}" \
                                 "${BUILD_NUMBER}" \
-                                "${GITHUB_REPO_URL}" \
+                                "${GITOPS_REPO_URL}" \
                                 "${GIT_USER_NAME}" \
                                 "${GIT_USER_EMAIL}"
                             
