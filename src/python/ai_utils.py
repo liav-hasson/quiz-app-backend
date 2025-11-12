@@ -1,6 +1,8 @@
-import os
-import boto3
-from openai import OpenAI
+"""
+AI utilities for generating quiz questions and evaluating answers using OpenAI.
+"""
+import boto3 
+from openai import OpenAI 
 
 # Importing config class in config.py
 from config import Config
@@ -9,7 +11,7 @@ def _get_api_key_from_ssm():
     """
     Try to read the API key from AWS SSM Parameter Store.
     """
-    
+
     ssm = boto3.client('ssm')
     resp = ssm.get_parameter(Name=Config.SSM_PARAMETER_NAME, WithDecryption=True)
     return resp['Parameter']['Value']
@@ -30,7 +32,7 @@ def _get_openai_client():
 
 def generate_question(category, keyword, difficulty):
     """Generate a question for a keyword and difficulty level."""
-    
+
     difficulty_label = {
         1: "basic level",
         2: "intermediate level",
@@ -52,7 +54,7 @@ def generate_question(category, keyword, difficulty):
 
 def evaluate_answer(question, answer, difficulty):
     """Generate a response based on the question and answer."""
-    
+
     difficulty_label = {
         1: "basic level",
         2: "intermediate level",
