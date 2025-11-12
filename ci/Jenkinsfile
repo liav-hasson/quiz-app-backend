@@ -264,7 +264,6 @@ pipeline {
                                                       usernameVariable: 'GIT_USERNAME', 
                                                       passwordVariable: 'GIT_PASSWORD')]) {
                         sh '''
-                            # Configure git credential helper for this session
                             git config --global credential.helper store
                             echo "https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com" > ~/.git-credentials
                             
@@ -277,7 +276,6 @@ pipeline {
                                 "${GIT_USER_NAME}" \
                                 "${GIT_USER_EMAIL}"
                             
-                            # Clean up credentials
                             rm -f ~/.git-credentials
                             git config --global --unset credential.helper
                         '''
