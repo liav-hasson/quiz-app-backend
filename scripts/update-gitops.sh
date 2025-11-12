@@ -60,6 +60,16 @@ echo "--------- Updating Helm chart ---------"
 cd quiz-backend
 
 # Update image repository and tag in values.yaml
+sed -i "s|repository: .*|repository: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}|g" values.yaml
+sed -i "s|tag: \".*\"|tag: \"${IMAGE_TAG}\"|g" values.yaml
+
+# Update appVersion in Chart.yaml
+sed -i "s|appVersion: \".*\"|appVersion: \"${IMAGE_TAG}\"|g" Chart.yaml
+
+# Show the changes
+echo "Changes made:"
+git diff values.yaml Chart.yaml
+
 # Commit and push
 echo "--------- Committing changes ---------"
 git add values.yaml Chart.yaml
