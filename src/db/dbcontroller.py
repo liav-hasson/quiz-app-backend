@@ -37,7 +37,7 @@ class DBController:
 
     def disconnect(self):
         """Disconnect from MongoDB"""
-        if self.client:
+        if self.client is not None:
             self.client.close()
             print("Disconnected from MongoDB")
 
@@ -47,7 +47,7 @@ class DBController:
 
     def get_collection(self, collection_name):
         """Get a specific collection"""
-        if self.db:
+        if self.db is not None:
             return self.db[collection_name]
         else:
             raise Exception("Not connected to database")
