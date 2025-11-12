@@ -106,6 +106,10 @@ if [ -n "$GITHUB_USERNAME" ] && [ -n "$GITHUB_PASSWORD" ]; then
     echo "Repository path: ${REPO_PATH}"
     AUTHENTICATED_URL="https://${GITHUB_USERNAME}:${GITHUB_PASSWORD}@${REPO_PATH}"
     
+    # Disable credential helpers to avoid cached credentials
+    git config --local credential.helper ""
+    git config --local --unset-all credential.helper || true
+    
     # Set the remote URL with authentication
     git remote set-url origin "$AUTHENTICATED_URL"
     
@@ -118,7 +122,8 @@ else
     echo "WARNING: No GitHub credentials provided, push may fail!"
 fi
 
-git push origin main
+# Use GIT_TERMINAL_PROMPT=0 to prevent any interactive prompts
+GIT_TERMINAL_PROMPT=0 git push origin main
 
 # Tag the release version for next build's version calculation
 echo "--------- Tagging release version ---------"
