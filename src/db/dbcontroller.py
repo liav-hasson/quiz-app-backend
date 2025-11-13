@@ -1,23 +1,25 @@
 import pymongo
+import os
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
 
 class DBController:
-    def __init__(self, host="mongodb.mongodb.svc.cluster.local", port=27017, db_name="quizdb"):
+    def __init__(self, host=None, port=None, db_name="quizdb"):
         """
         Initialize MongoDB connection
         
         Args:
-            host: MongoDB hostname (default: Kubernetes service DNS)
-            port: MongoDB port (default: 27017)
+            host: MongoDB hostname (default: from env MONGODB_HOST or Kubernetes service DNS)
+            port: MongoDB port (default: from env MONGODB_PORT or 27017)
             db_name: Database name (default: quizdb)
         
         Note: In Kubernetes, use mongodb.mongodb.svc.cluster.local
-              For local development, use localhost
+              For docker-compose, use 'mongodb' (service name)
+              For local development, use 'localhost'
         """
-        self.host = host
-        self.port = port
+        self.host = host or os.environ.get("MONGODB_HOST", "mongodb.mongodb.svc.cluster.local")
+        self.port = port or int(os.environ.get("MONGODB_PORT", "27017"))
         self.db_name = db_name
         self.client = None
         self.db = None
