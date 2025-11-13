@@ -100,52 +100,54 @@ pipeline {
 
         stage('Testing stage') {
             steps {
-                echo '--------- Starting checkout and testing ---------'
+                script {
+                    echo '--------- Starting checkout and testing ---------'
 
-                echo '--------- Running pylint test ---------'
-                sh '''
-                    # Run pylint on all Python files in src/python directory
-                    echo "Running pylint on Python source files..."
-                    for pyfile in ${PYTHON_SRC_DIR}/*.py; do
-                        if [ -f "$pyfile" ]; then
-                            echo "Linting: $pyfile"
-                            pylint "$pyfile" --score=yes --fail-under=5.0
-                        fi
-                    done
-                '''
-                echo 'Pylint checks passed!'
+                    echo '--------- Running pylint test ---------'
+                    sh '''
+                        # Run pylint on all Python files in src/python directory
+                        echo "Running pylint on Python source files..."
+                        for pyfile in ${PYTHON_SRC_DIR}/*.py; do
+                            if [ -f "$pyfile" ]; then
+                                echo "Linting: $pyfile"
+                                pylint "$pyfile" --score=yes --fail-under=5.0
+                            fi
+                        done
+                    '''
+                    echo 'Pylint checks passed!'
 
-                echo '--------- Running unit tests ---------'
-                sh '''
-                    # Run pytest with coverage
-                    # Dependencies are pre-installed in the agent Docker image
-                    echo "Running pytest on test suite..."
-                    cd "${APP_DIR}"
-                    pytest tests/ -v --tb=short || {
-                        echo "Unit tests failed!"
-                        exit 1
-                    }
-                '''
-                echo 'Unit tests passed!'
-
-                echo '--------- Running dependency vulnerability scan ---------'
-                sh '''
-                    # Run safety check on production dependencies only
-                    # Focus on src/requirements.txt (production dependencies)
-                    # Exit code 64 means vulnerabilities found, 0 means clean
-                    safety check --json --file "${REQUIREMENTS_FILE}" || {
-                        if [ $? -eq 64 ]; then
-                            echo "CRITICAL: Vulnerabilities found in production dependencies!"
-                            echo "Pipeline failed due to security vulnerabilities in $REQUIREMENTS_FILE"
-                            safety check --file "${REQUIREMENTS_FILE}" --output text
+                    echo '--------- Running unit tests ---------'
+                    sh '''
+                        # Run pytest with coverage
+                        # Dependencies are pre-installed in the agent Docker image
+                        echo "Running pytest on test suite..."
+                        cd "${APP_DIR}"
+                        pytest tests/ -v --tb=short || {
+                            echo "Unit tests failed!"
                             exit 1
-                        else
-                            echo "Safety check failed with unexpected error"
-                            exit 1
-                        fi
-                    }
-                '''
-                echo 'Dependency vulnerability scan passed!'
+                        }
+                    '''
+                    echo 'Unit tests passed!'
+
+                    echo '--------- Running dependency vulnerability scan ---------'
+                    sh '''
+                        # Run safety check on production dependencies only
+                        # Focus on src/requirements.txt (production dependencies)
+                        # Exit code 64 means vulnerabilities found, 0 means clean
+                        safety check --json --file "${REQUIREMENTS_FILE}" || {
+                            if [ $? -eq 64 ]; then
+                                echo "CRITICAL: Vulnerabilities found in production dependencies!"
+                                echo "Pipeline failed due to security vulnerabilities in $REQUIREMENTS_FILE"
+                                safety check --file "${REQUIREMENTS_FILE}" --output text
+                                exit 1
+                            else
+                                echo "Safety check failed with unexpected error"
+                                exit 1
+                            fi
+                        }
+                    '''
+                    echo 'Dependency vulnerability scan passed!'
+                }
             }
             post {
                 failure {
@@ -158,25 +160,27 @@ pipeline {
 
         stage('Python Static Security Analysis') {
             steps {
-                echo '--------- Running Python static security analysis ---------'
-                sh '''
-                    # Run Bandit security analysis on Python source code
-                    echo "Scanning Python code with Bandit..."
-                    bandit -r "${PYTHON_SRC_DIR}" -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
-                    
-                    # Display results in human-readable format  
-                    echo "Bandit scan results:"
-                    bandit -r "${PYTHON_SRC_DIR}" -f txt || true
-                    
-                    # Check if high/medium severity issues found (exit codes 1-2)
-                    if [ "${BANDIT_EXIT_CODE:-0}" -eq 1 ] || [ "${BANDIT_EXIT_CODE:-0}" -eq 2 ]; then
-                        echo "CRITICAL: High/Medium severity security issues found in Python code!"
-                        echo "Pipeline failed due to Python security vulnerabilities"
-                        echo "Fix the security issues above and retry the build"
-                        exit 1
-                    fi
-                '''
-                echo 'Python static security analysis passed!'
+                script {
+                    echo '--------- Running Python static security analysis ---------'
+                    sh '''
+                        # Run Bandit security analysis on Python source code
+                        echo "Scanning Python code with Bandit..."
+                        bandit -r "${PYTHON_SRC_DIR}" -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
+                        
+                        # Display results in human-readable format  
+                        echo "Bandit scan results:"
+                        bandit -r "${PYTHON_SRC_DIR}" -f txt || true
+                        
+                        # Check if high/medium severity issues found (exit codes 1-2)
+                        if [ "${BANDIT_EXIT_CODE:-0}" -eq 1 ] || [ "${BANDIT_EXIT_CODE:-0}" -eq 2 ]; then
+                            echo "CRITICAL: High/Medium severity security issues found in Python code!"
+                            echo "Pipeline failed due to Python security vulnerabilities"
+                            echo "Fix the security issues above and retry the build"
+                            exit 1
+                        fi
+                    '''
+                    echo 'Python static security analysis passed!'
+                }
             }
             post {
                 failure {
@@ -193,26 +197,28 @@ pipeline {
 
         stage('Dockerfile Security Scan') {
             steps {
-                echo '--------- Running Dockerfile security scan ---------'
-                sh '''
-                    # Run Hadolint security scan on Dockerfile
-                    # Check for security issues, best practices, and compliance
-                    echo "Scanning Dockerfile with Hadolint..."
-                    hadolint --format json ${CI_DIR}/app-dockerfile/Dockerfile > hadolint-report.json || HADOLINT_EXIT_CODE=$?
-                    
-                    # Display results in human-readable format
-                    echo "Hadolint scan results:"
-                    hadolint ${CI_DIR}/app-dockerfile/Dockerfile || true
-                    
-                    # Check if critical/error level issues found
-                    if [ "${HADOLINT_EXIT_CODE:-0}" -ne 0 ]; then
-                        echo "CRITICAL: Dockerfile security issues found!"
-                        echo "Pipeline failed due to Dockerfile security violations"
-                        echo "Fix the issues above and retry the build"
-                        exit 1
-                    fi
-                '''
-                echo 'Dockerfile security scan passed!'
+                script {
+                    echo '--------- Running Dockerfile security scan ---------'
+                    sh '''
+                        # Run Hadolint security scan on Dockerfile
+                        # Check for security issues, best practices, and compliance
+                        echo "Scanning Dockerfile with Hadolint..."
+                        hadolint --format json ${CI_DIR}/app-dockerfile/Dockerfile > hadolint-report.json || HADOLINT_EXIT_CODE=$?
+                        
+                        # Display results in human-readable format
+                        echo "Hadolint scan results:"
+                        hadolint ${CI_DIR}/app-dockerfile/Dockerfile || true
+                        
+                        # Check if critical/error level issues found
+                        if [ "${HADOLINT_EXIT_CODE:-0}" -ne 0 ]; then
+                            echo "CRITICAL: Dockerfile security issues found!"
+                            echo "Pipeline failed due to Dockerfile security violations"
+                            echo "Fix the issues above and retry the build"
+                            exit 1
+                        fi
+                    '''
+                    echo 'Dockerfile security scan passed!'
+                }
             }
             post {
                 failure {
@@ -305,8 +311,6 @@ pipeline {
                     "${statusIcon} GitOps Pipeline *${env.JOB_NAME}* #${env.BUILD_NUMBER} ${env.PIPELINE_STATUS}",
                     "",
                     "*Docker Image:* ${env.DOCKERHUB_CREDENTIALS_USR}/${env.DOCKER_IMAGE_NAME}:${env.IMAGE_TAG}",
-                    "*GitOps Repo:* GitHub repository updated",
-                    "*Deployment:* ArgoCD will sync automatically", 
                     "${slackMessage}"
                 ].join('\n')
 
