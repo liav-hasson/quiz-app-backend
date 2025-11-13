@@ -24,6 +24,14 @@ mock_db_controller.connect.return_value = True
 mock_db_controller.db = MagicMock()
 
 # Patch dbcontroller module before any imports
+# Need to patch both 'dbcontroller' and 'db.dbcontroller' since imports use different paths
 sys.modules['dbcontroller'] = MagicMock()
 sys.modules['dbcontroller'].DBController = MagicMock(return_value=mock_db_controller)
 sys.modules['dbcontroller'].QuizController = MagicMock(return_value=mock_quiz_controller)
+
+# Also patch the db.dbcontroller module path
+mock_db_module = MagicMock()
+mock_db_module.DBController = MagicMock(return_value=mock_db_controller)
+mock_db_module.QuizController = MagicMock(return_value=mock_quiz_controller)
+mock_db_module.DataMigrator = MagicMock()
+sys.modules['db.dbcontroller'] = mock_db_module
