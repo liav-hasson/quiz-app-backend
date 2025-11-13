@@ -1,9 +1,8 @@
 """Quiz app REST API."""
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, g
 import logging
 import time
-from flask import Flask, request, jsonify, g
 from prometheus_flask_exporter import PrometheusMetrics
 from config import Config
 from validation import validate_difficulty, validate_required_fields
@@ -125,15 +124,12 @@ def error_response(message, code=400):
 
 
 # Health check route
-@app.route("/api/health")
-# Health check route
 @app.route('/api/health')
 def health():
     """Health check."""
-    db_status = "connected" if db_controller and db_controller.db else "disconnected"
-    return jsonify({"status": "ok", "database": db_status})
     logger.debug("health_check_called")
-    return jsonify({'status': 'ok'})
+    db_status = "connected" if db_controller and db_controller.db else "disconnected"
+    return jsonify({'status': 'ok', 'database': db_status})
 
 
 # Returns all categories
@@ -142,16 +138,11 @@ def api_categories():
     """Get all categories."""
     try:
         categories = get_categories()
-        return jsonify({"categories": categories})
-    except Exception as e:
-        return error_response(f"Failed to get categories: {str(e)}", 500)
-    try:
-        categories = get_categories()
         logger.info("categories_fetched count=%d", len(categories))
         return jsonify({'categories': categories})
     except Exception as e:
         logger.error("categories_fetch_failed error=%s", str(e), exc_info=True)
-        raise
+        return error_response(f"Failed to get categories: {str(e)}", 500)
 
 
 @app.route("/api/subjects")
@@ -159,13 +150,6 @@ def api_subjects():
     """Get subjects for category."""
     category = request.args.get("category")
     if not category:
-        return error_response("category parameter required")
-
-    try:
-        subjects = get_subjects(category)
-        return jsonify({"subjects": subjects})
-    except Exception as e:
-        return error_response(f"Failed to get subjects: {str(e)}", 500)
         logger.warning("subjects_request_missing_category")
         return error_response('category parameter required')
     
@@ -175,7 +159,7 @@ def api_subjects():
         return jsonify({'subjects': subjects})
     except Exception as e:
         logger.error("subjects_fetch_failed category=%s error=%s", category, str(e), exc_info=True)
-        raise
+        return error_response(f"Failed to get subjects: {str(e)}", 500)
 
 
 @app.route("/api/question/generate", methods=["POST"])
@@ -189,22 +173,6 @@ def api_generate_question():
     except ValueError as e:
         logger.warning("generate_question_validation_failed error=%s", str(e))
         return error_response(str(e))
-
-    keyword = get_random_keyword(data["category"], data["subject"])
-    if not keyword:
-        return error_response("No keywords found", 404)
-
-    question = generate_question(data["category"], keyword, difficulty)
-
-    return jsonify(
-        {
-            "question": question,
-            "keyword": keyword,
-            "category": data["category"],
-            "subject": data["subject"],
-            "difficulty": difficulty,
-        }
-    )
     
     logger.info(
         "generating_question category=%s subject=%s difficulty=%d",
@@ -261,9 +229,6 @@ def api_evaluate_answer():
     except ValueError as e:
         logger.warning("evaluate_answer_validation_failed error=%s", str(e))
         return error_response(str(e))
-
-    feedback = evaluate_answer(data["question"], data["answer"], difficulty)
-    return jsonify({"feedback": feedback})
     
     logger.info("evaluating_answer difficulty=%d answer_length=%d", difficulty, len(data['answer']))
     
