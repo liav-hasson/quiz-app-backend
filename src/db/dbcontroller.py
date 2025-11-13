@@ -350,7 +350,7 @@ class QuizController:
         return found_items
 
     def get_random_keywords(
-        self, topic: str = None, count: int = 10
+        self, topic: Optional[str] = None, count: int = 10
     ) -> List[Dict[str, Any]]:
         """Get random keywords for quiz generation"""
         collection = self._get_collection()
@@ -443,7 +443,7 @@ if __name__ == "__main__":
 
         try:
             # MIGRATION EXAMPLE: Import from your existing db.json
-            json_file_path = "/home/l33t/projects/quizapp/src/db/db.json"
+            json_file_path = "./db.json"
             print("Migrating data from JSON to MongoDB...")
             if migrator.migrate_from_json_file(json_file_path):
                 print("✅ Migration successful!")
