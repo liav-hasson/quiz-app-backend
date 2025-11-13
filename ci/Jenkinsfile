@@ -122,7 +122,7 @@ pipeline {
                         # Dependencies are pre-installed in the agent Docker image
                         echo "Running pytest on test suite..."
                         cd "${APP_DIR}"
-                        pytest tests/ -v --tb=short || {
+                        pytest tests/ --tb=short || {
                             echo "Unit tests failed!"
                             exit 1
                         }

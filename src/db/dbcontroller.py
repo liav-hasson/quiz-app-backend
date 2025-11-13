@@ -3,6 +3,33 @@ import os
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
+try:
+    import boto3
+except ImportError:
+    boto3 = None
+
+
+def _get_mongodb_credentials_from_ssm():
+    """
+    Fetch MongoDB credentials from AWS SSM Parameter Store.
+    Returns (username, password) tuple or (None, None) if not available.
+    """
+    # Skip SSM in tests
+    if os.environ.get('PYTEST_CURRENT_TEST'):
+        return None, None
+    
+    if not boto3:
+        return None, None
+    
+    try:
+        ssm = boto3.client('ssm', region_name=os.environ.get('AWS_REGION', 'eu-north-1'))
+        username = ssm.get_parameter(Name='/quiz-app/mongodb/root-username', WithDecryption=False)['Parameter']['Value']
+        password = ssm.get_parameter(Name='/quiz-app/mongodb/root-password', WithDecryption=True)['Parameter']['Value']
+        return username, password
+    except Exception as e:
+        print(f"Could not fetch MongoDB credentials from SSM: {e}")
+        return None, None
+
 
 class DBController:
     def __init__(self, host=None, port=None, db_name="quizdb", username=None, password=None):
@@ -13,19 +40,33 @@ class DBController:
             host: MongoDB hostname (default: from env MONGODB_HOST or Kubernetes service DNS)
             port: MongoDB port (default: from env MONGODB_PORT or 27017)
             db_name: Database name (default: quizdb)
-            username: MongoDB username (default: from env MONGODB_USERNAME)
-            password: MongoDB password (default: from env MONGODB_PASSWORD)
+            username: MongoDB username (default: from env MONGODB_USERNAME or SSM Parameter Store)
+            password: MongoDB password (default: from env MONGODB_PASSWORD or SSM Parameter Store)
         
         Note: In Kubernetes, use mongodb.mongodb.svc.cluster.local
               For docker-compose, use 'mongodb' (service name)
               For local development, use 'localhost'
-              Authentication is optional - if username/password not provided, connects without auth
+              
+        Credential priority:
+        1. Explicitly passed username/password
+        2. Environment variables (MONGODB_USERNAME, MONGODB_PASSWORD)
+        3. AWS SSM Parameter Store (/quiz-app/mongodb/root-username, /quiz-app/mongodb/root-password)
+        4. No authentication (fallback)
         """
         self.host = host or os.environ.get("MONGODB_HOST", "mongodb.mongodb.svc.cluster.local")
         self.port = port or int(os.environ.get("MONGODB_PORT", "27017"))
         self.db_name = db_name
+        
+        # Try to get credentials in priority order
         self.username = username or os.environ.get("MONGODB_USERNAME")
         self.password = password or os.environ.get("MONGODB_PASSWORD")
+        
+        # If env vars not set, try fetching from SSM Parameter Store
+        if not self.username or not self.password:
+            ssm_username, ssm_password = _get_mongodb_credentials_from_ssm()
+            self.username = self.username or ssm_username
+            self.password = self.password or ssm_password
+        
         self.client = None
         self.db = None
 
@@ -34,9 +75,9 @@ class DBController:
         try:
             # Build connection string with or without authentication
             if self.username and self.password:
-                # Authenticated connection
-                connection_string = f"mongodb://{self.username}:{self.password}@{self.host}:{self.port}/{self.db_name}?authSource={self.db_name}"
-                print(f"Connecting to MongoDB at {self.host}:{self.port} as user '{self.username}'")
+                # Authenticated connection - use 'admin' as authSource for root user
+                connection_string = f"mongodb://{self.username}:{self.password}@{self.host}:{self.port}/{self.db_name}?authSource=admin"
+                print(f"Connecting to MongoDB at {self.host}:{self.port} as user '{self.username}' (authSource=admin)")
             else:
                 # Unauthenticated connection (for local development/testing)
                 connection_string = f"mongodb://{self.host}:{self.port}/"
