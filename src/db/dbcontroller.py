@@ -8,17 +8,19 @@ class DBController:
     def __init__(self, host=None, port=None, db_name="quizdb"):
         """
         Initialize MongoDB connection
-        
+
         Args:
             host: MongoDB hostname (default: from env MONGODB_HOST or Kubernetes service DNS)
             port: MongoDB port (default: from env MONGODB_PORT or 27017)
             db_name: Database name (default: quizdb)
-        
+
         Note: In Kubernetes, use mongodb.mongodb.svc.cluster.local
               For docker-compose, use 'mongodb' (service name)
               For local development, use 'localhost'
         """
-        self.host = host or os.environ.get("MONGODB_HOST", "mongodb.mongodb.svc.cluster.local")
+        self.host = host or os.environ.get(
+            "MONGODB_HOST", "mongodb.mongodb.svc.cluster.local"
+        )
         self.port = port or int(os.environ.get("MONGODB_PORT", "27017"))
         self.db_name = db_name
         self.client = None
@@ -75,7 +77,7 @@ class UserController:
         self,
         username: str,
         hashed_password: str,
-        profile_picture: str = None,
+        profile_picture: Optional[str] = None,
         experience: int = 0,
     ) -> str:
         """
@@ -175,7 +177,7 @@ class UserController:
         return result.modified_count > 0
 
     def get_users_by_experience_range(
-        self, min_exp: int = 0, max_exp: int = None
+        self, min_exp: int = 0, max_exp: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """Get users within experience range"""
         collection = self._get_collection()

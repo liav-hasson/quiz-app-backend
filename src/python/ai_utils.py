@@ -1,14 +1,16 @@
 """
 AI utilities for generating quiz questions and evaluating answers using OpenAI.
 """
+
 import logging
-import boto3 
-from openai import OpenAI 
+import boto3
+from openai import OpenAI
 
 # Importing config class in config.py
 from config import Config
 
 logger = logging.getLogger(__name__)
+
 
 def _get_api_key_from_ssm():
     """
@@ -16,10 +18,10 @@ def _get_api_key_from_ssm():
     """
     logger.info("fetching_api_key_from_ssm parameter=%s", Config.SSM_PARAMETER_NAME)
     try:
-        ssm = boto3.client('ssm')
+        ssm = boto3.client("ssm")
         resp = ssm.get_parameter(Name=Config.SSM_PARAMETER_NAME, WithDecryption=True)
         logger.info("api_key_fetched_from_ssm")
-        return resp['Parameter']['Value']
+        return resp["Parameter"]["Value"]
     except Exception as e:
         logger.error("ssm_api_key_fetch_failed error=%s", str(e))
         raise
@@ -40,9 +42,10 @@ def _get_openai_client():
 
     return OpenAI(api_key=api_key)
 
+
 def generate_question(category, subcategory, keyword, difficulty, style_modifier=None):
     """Generate a question for a keyword and difficulty level.
-    
+
     Args:
         category: Main topic category (e.g., "Kubernetes", "Docker")
         subcategory: Subcategory within topic (e.g., "Commands", "Architecture")
@@ -57,14 +60,10 @@ def generate_question(category, subcategory, keyword, difficulty, style_modifier
         keyword,
         difficulty,
         style_modifier,
-        Config.OPENAI_MODEL
+        Config.OPENAI_MODEL,
     )
 
-    difficulty_label = {
-        1: "easy",
-        2: "intermediate",
-        3: "advanced"
-    }[difficulty]
+    difficulty_label = {1: "easy", 2: "intermediate", 3: "advanced"}[difficulty]
 
     # Build the prompt
     prompt = Config.QUESTION_PROMPT[difficulty].format(
@@ -72,7 +71,7 @@ def generate_question(category, subcategory, keyword, difficulty, style_modifier
         subcategory=subcategory,
         keyword=keyword,
         difficulty_label=difficulty_label,
-        style_modifier=style_modifier if style_modifier else "general explanation"
+        style_modifier=style_modifier if style_modifier else "general explanation",
     )
 
     try:
@@ -81,16 +80,24 @@ def generate_question(category, subcategory, keyword, difficulty, style_modifier
             model=Config.OPENAI_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=Config.OPENAI_TEMPERATURE_QUESTION,
-            max_tokens=Config.OPENAI_MAX_TOKENS_QUESTION
+            max_tokens=Config.OPENAI_MAX_TOKENS_QUESTION,
         )
-        result = api_response.choices[0].message.content.strip()
+        result = api_response.choices[0].message.content
+        if result is None:
+            raise ValueError("OpenAI returned empty response")
+        result = result.strip()
+
+        tokens_used = 0
+        if hasattr(api_response, "usage") and api_response.usage is not None:
+            tokens_used = api_response.usage.total_tokens
+
         logger.info(
             "openai_generate_question_success category=%s subcategory=%s keyword=%s difficulty=%d tokens_used=%d",
             category,
             subcategory,
             keyword,
             difficulty,
-            api_response.usage.total_tokens if hasattr(api_response, 'usage') else 0
+            tokens_used,
         )
         return result
     except Exception as e:
@@ -100,13 +107,14 @@ def generate_question(category, subcategory, keyword, difficulty, style_modifier
             subcategory,
             keyword,
             str(e),
-            exc_info=True
+            exc_info=True,
         )
         raise
 
+
 def evaluate_answer(question, answer, difficulty, keyword=None):
     """Generate a response based on the question and answer.
-    
+
     Args:
         question: The question that was asked
         answer: User's answer to evaluate
@@ -118,20 +126,16 @@ def evaluate_answer(question, answer, difficulty, keyword=None):
         difficulty,
         len(answer),
         keyword,
-        Config.OPENAI_MODEL
+        Config.OPENAI_MODEL,
     )
 
-    difficulty_label = {
-        1: "basic",
-        2: "intermediate",
-        3: "advanced"
-    }[difficulty]
+    difficulty_label = {1: "basic", 2: "intermediate", 3: "advanced"}[difficulty]
 
     prompt = Config.EVAL_PROMPT.format(
         question=question,
         answer=answer,
         difficulty_label=difficulty_label,
-        keyword=keyword if keyword else "N/A"
+        keyword=keyword if keyword else "N/A",
     )
 
     try:
@@ -140,13 +144,21 @@ def evaluate_answer(question, answer, difficulty, keyword=None):
             model=Config.OPENAI_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=Config.OPENAI_TEMPERATURE_EVAL,
-            max_tokens=Config.OPENAI_MAX_TOKENS_EVAL
+            max_tokens=Config.OPENAI_MAX_TOKENS_EVAL,
         )
-        result = api_response.choices[0].message.content.strip()
+        result = api_response.choices[0].message.content
+        if result is None:
+            raise ValueError("OpenAI returned empty response")
+        result = result.strip()
+
+        tokens_used = 0
+        if hasattr(api_response, "usage") and api_response.usage is not None:
+            tokens_used = api_response.usage.total_tokens
+
         logger.info(
             "openai_evaluate_answer_success difficulty=%d tokens_used=%d",
             difficulty,
-            api_response.usage.total_tokens if hasattr(api_response, 'usage') else 0
+            tokens_used,
         )
         return result
     except Exception as e:
@@ -154,6 +166,6 @@ def evaluate_answer(question, answer, difficulty, keyword=None):
             "openai_evaluate_answer_failed difficulty=%d error=%s",
             difficulty,
             str(e),
-            exc_info=True
+            exc_info=True,
         )
         raise

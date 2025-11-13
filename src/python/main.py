@@ -19,8 +19,7 @@ from db.dbcontroller import DBController, QuizController, DataMigrator
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -88,7 +87,7 @@ def initialize_database():
 metrics = PrometheusMetrics(app)
 
 # Add custom info metric
-metrics.info('quiz_app_info', 'Quiz Application Info', version='1.0.0')
+metrics.info("quiz_app_info", "Quiz Application Info", version="1.0.0")
 
 
 @app.before_request
@@ -99,23 +98,24 @@ def before_request():
         "request_started method=%s path=%s remote_addr=%s",
         request.method,
         request.path,
-        request.remote_addr
+        request.remote_addr,
     )
 
 
 @app.after_request
 def after_request(response):
     """Log request completion with duration."""
-    if hasattr(g, 'start_time'):
+    if hasattr(g, "start_time"):
         duration = time.time() - g.start_time
         logger.info(
             "request_completed method=%s path=%s status=%s duration_ms=%.2f",
             request.method,
             request.path,
             response.status_code,
-            duration * 1000
+            duration * 1000,
         )
     return response
+
 
 # Error message template
 def error_response(message, code=400):
@@ -124,12 +124,16 @@ def error_response(message, code=400):
 
 
 # Health check route
-@app.route('/api/health')
+@app.route("/api/health")
 def health():
     """Health check."""
     logger.debug("health_check_called")
-    db_status = "connected" if db_controller and db_controller.db else "disconnected"
-    return jsonify({'status': 'ok', 'database': db_status})
+    db_status = (
+        "connected"
+        if db_controller and db_controller.db is not None
+        else "disconnected"
+    )
+    return jsonify({"status": "ok", "database": db_status})
 
 
 # Returns all categories
@@ -139,7 +143,7 @@ def api_categories():
     try:
         categories = get_categories()
         logger.info("categories_fetched count=%d", len(categories))
-        return jsonify({'categories': categories})
+        return jsonify({"categories": categories})
     except Exception as e:
         logger.error("categories_fetch_failed error=%s", str(e), exc_info=True)
         return error_response(f"Failed to get categories: {str(e)}", 500)
@@ -151,14 +155,19 @@ def api_subjects():
     category = request.args.get("category")
     if not category:
         logger.warning("subjects_request_missing_category")
-        return error_response('category parameter required')
-    
+        return error_response("category parameter required")
+
     try:
         subjects = get_subjects(category)
         logger.info("subjects_fetched category=%s count=%d", category, len(subjects))
-        return jsonify({'subjects': subjects})
+        return jsonify({"subjects": subjects})
     except Exception as e:
-        logger.error("subjects_fetch_failed category=%s error=%s", category, str(e), exc_info=True)
+        logger.error(
+            "subjects_fetch_failed category=%s error=%s",
+            category,
+            str(e),
+            exc_info=True,
+        )
         return error_response(f"Failed to get subjects: {str(e)}", 500)
 
 
@@ -173,47 +182,52 @@ def api_generate_question():
     except ValueError as e:
         logger.warning("generate_question_validation_failed error=%s", str(e))
         return error_response(str(e))
-    
+
     logger.info(
         "generating_question category=%s subject=%s difficulty=%d",
-        data['category'],
-        data['subject'],
-        difficulty
+        data["category"],
+        data["subject"],
+        difficulty,
     )
-    
+
     try:
-        keyword = get_random_keyword(data['category'], data['subject'])
+        keyword = get_random_keyword(data["category"], data["subject"])
         if not keyword:
             logger.warning(
                 "no_keywords_found category=%s subject=%s",
-                data['category'],
-                data['subject']
+                data["category"],
+                data["subject"],
+                data["difficulty"],
             )
-            return error_response('No keywords found', 404)
-        
-        question = generate_question(data['category'], keyword, difficulty)
+            return error_response("No keywords found", 404)
+
+        question = generate_question(
+            data["category"], data["subject"], keyword, difficulty
+        )
         logger.info(
             "question_generated category=%s subject=%s difficulty=%d keyword=%s",
-            data['category'],
-            data['subject'],
+            data["category"],
+            data["subject"],
             difficulty,
-            keyword
+            keyword,
         )
-        
-        return jsonify({
-            'question': question,
-            'keyword': keyword,
-            'category': data['category'],
-            'subject': data['subject'],
-            'difficulty': difficulty
-        })
+
+        return jsonify(
+            {
+                "question": question,
+                "keyword": keyword,
+                "category": data["category"],
+                "subject": data["subject"],
+                "difficulty": difficulty,
+            }
+        )
     except Exception as e:
         logger.error(
             "question_generation_failed category=%s subject=%s error=%s",
-            data['category'],
-            data['subject'],
+            data["category"],
+            data["subject"],
             str(e),
-            exc_info=True
+            exc_info=True,
         )
         raise
 
@@ -229,13 +243,21 @@ def api_evaluate_answer():
     except ValueError as e:
         logger.warning("evaluate_answer_validation_failed error=%s", str(e))
         return error_response(str(e))
-    
-    logger.info("evaluating_answer difficulty=%d answer_length=%d", difficulty, len(data['answer']))
-    
+
+    logger.info(
+        "evaluating_answer difficulty=%d answer_length=%d",
+        difficulty,
+        len(data["answer"]),
+    )
+
     try:
-        feedback = evaluate_answer(data['question'], data['answer'], difficulty)
-        logger.info("answer_evaluated difficulty=%d feedback_length=%d", difficulty, len(feedback))
-        return jsonify({'feedback': feedback})
+        feedback = evaluate_answer(data["question"], data["answer"], difficulty)
+        logger.info(
+            "answer_evaluated difficulty=%d feedback_length=%d",
+            difficulty,
+            len(feedback),
+        )
+        return jsonify({"feedback": feedback})
     except Exception as e:
         logger.error("answer_evaluation_failed error=%s", str(e), exc_info=True)
         raise
