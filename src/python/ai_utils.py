@@ -1,14 +1,16 @@
 """
 AI utilities for generating quiz questions and evaluating answers using OpenAI.
 """
+
 import logging
-import boto3 
-from openai import OpenAI 
+import boto3
+from openai import OpenAI
 
 # Importing config class in config.py
 from config import Config
 
 logger = logging.getLogger(__name__)
+
 
 def _get_api_key_from_ssm():
     """
@@ -16,10 +18,10 @@ def _get_api_key_from_ssm():
     """
     logger.info("fetching_api_key_from_ssm parameter=%s", Config.SSM_PARAMETER_NAME)
     try:
-        ssm = boto3.client('ssm')
+        ssm = boto3.client("ssm")
         resp = ssm.get_parameter(Name=Config.SSM_PARAMETER_NAME, WithDecryption=True)
         logger.info("api_key_fetched_from_ssm")
-        return resp['Parameter']['Value']
+        return resp["Parameter"]["Value"]
     except Exception as e:
         logger.error("ssm_api_key_fetch_failed error=%s", str(e))
         raise
@@ -40,26 +42,36 @@ def _get_openai_client():
 
     return OpenAI(api_key=api_key)
 
-def generate_question(category, keyword, difficulty):
-    """Generate a question for a keyword and difficulty level."""
+
+def generate_question(category, subcategory, keyword, difficulty, style_modifier=None):
+    """Generate a question for a keyword and difficulty level.
+
+    Args:
+        category: Main topic category (e.g., "Kubernetes", "Docker")
+        subcategory: Subcategory within topic (e.g., "Commands", "Architecture")
+        keyword: Specific keyword to focus on
+        difficulty: Difficulty level (1=basic, 2=intermediate, 3=advanced)
+        style_modifier: Optional style modifier to guide question format
+    """
     logger.info(
-        "openai_generate_question_start category=%s keyword=%s difficulty=%d model=%s",
+        "openai_generate_question_start category=%s subcategory=%s keyword=%s difficulty=%d style_modifier=%s model=%s",
         category,
+        subcategory,
         keyword,
         difficulty,
-        Config.OPENAI_MODEL
+        style_modifier,
+        Config.OPENAI_MODEL,
     )
 
-    difficulty_label = {
-        1: "basic level",
-        2: "intermediate level",
-        3: "advanced level"
-    }[difficulty]
+    difficulty_label = {1: "easy", 2: "intermediate", 3: "advanced"}[difficulty]
 
-    prompt = QUESTION_PROMPT[difficulty].format(
-        keyword=keyword,
+    # Build the prompt
+    prompt = Config.QUESTION_PROMPT[difficulty].format(
         category=category,
-        difficulty_label=difficulty_label
+        subcategory=subcategory,
+        keyword=keyword,
+        difficulty_label=difficulty_label,
+        style_modifier=style_modifier if style_modifier else "general explanation",
     )
 
     try:
@@ -67,45 +79,63 @@ def generate_question(category, keyword, difficulty):
         api_response = client.chat.completions.create(
             model=Config.OPENAI_MODEL,
             messages=[{"role": "user", "content": prompt}],
+            temperature=Config.OPENAI_TEMPERATURE_QUESTION,
+            max_tokens=Config.OPENAI_MAX_TOKENS_QUESTION,
         )
-        result = api_response.choices[0].message.content.strip()
+        result = api_response.choices[0].message.content
+        if result is None:
+            raise ValueError("OpenAI returned empty response")
+        result = result.strip()
+
+        tokens_used = 0
+        if hasattr(api_response, "usage") and api_response.usage is not None:
+            tokens_used = api_response.usage.total_tokens
+
         logger.info(
-            "openai_generate_question_success category=%s keyword=%s difficulty=%d tokens_used=%d",
+            "openai_generate_question_success category=%s subcategory=%s keyword=%s difficulty=%d tokens_used=%d",
             category,
+            subcategory,
             keyword,
             difficulty,
-            api_response.usage.total_tokens if hasattr(api_response, 'usage') else 0
+            tokens_used,
         )
         return result
     except Exception as e:
         logger.error(
-            "openai_generate_question_failed category=%s keyword=%s error=%s",
+            "openai_generate_question_failed category=%s subcategory=%s keyword=%s error=%s",
             category,
+            subcategory,
             keyword,
             str(e),
-            exc_info=True
+            exc_info=True,
         )
         raise
 
-def evaluate_answer(question, answer, difficulty):
-    """Generate a response based on the question and answer."""
+
+def evaluate_answer(question, answer, difficulty, keyword=None):
+    """Generate a response based on the question and answer.
+
+    Args:
+        question: The question that was asked
+        answer: User's answer to evaluate
+        difficulty: Difficulty level (1-3)
+        keyword: Optional keyword for additional context
+    """
     logger.info(
-        "openai_evaluate_answer_start difficulty=%d answer_length=%d model=%s",
+        "openai_evaluate_answer_start difficulty=%d answer_length=%d keyword=%s model=%s",
         difficulty,
         len(answer),
-        Config.OPENAI_MODEL
+        keyword,
+        Config.OPENAI_MODEL,
     )
 
-    difficulty_label = {
-        1: "basic level",
-        2: "intermediate level",
-        3: "advanced level"
-    }[difficulty]
+    difficulty_label = {1: "basic", 2: "intermediate", 3: "advanced"}[difficulty]
 
-    prompt = EVAL_PROMPT.format(
+    prompt = Config.EVAL_PROMPT.format(
         question=question,
         answer=answer,
-        difficulty_label=difficulty_label
+        difficulty_label=difficulty_label,
+        keyword=keyword if keyword else "N/A",
     )
 
     try:
@@ -113,12 +143,22 @@ def evaluate_answer(question, answer, difficulty):
         api_response = client.chat.completions.create(
             model=Config.OPENAI_MODEL,
             messages=[{"role": "user", "content": prompt}],
+            temperature=Config.OPENAI_TEMPERATURE_EVAL,
+            max_tokens=Config.OPENAI_MAX_TOKENS_EVAL,
         )
-        result = api_response.choices[0].message.content.strip()
+        result = api_response.choices[0].message.content
+        if result is None:
+            raise ValueError("OpenAI returned empty response")
+        result = result.strip()
+
+        tokens_used = 0
+        if hasattr(api_response, "usage") and api_response.usage is not None:
+            tokens_used = api_response.usage.total_tokens
+
         logger.info(
             "openai_evaluate_answer_success difficulty=%d tokens_used=%d",
             difficulty,
-            api_response.usage.total_tokens if hasattr(api_response, 'usage') else 0
+            tokens_used,
         )
         return result
     except Exception as e:
@@ -126,50 +166,6 @@ def evaluate_answer(question, answer, difficulty):
             "openai_evaluate_answer_failed difficulty=%d error=%s",
             difficulty,
             str(e),
-            exc_info=True
+            exc_info=True,
         )
         raise
-
-
-QUESTION_PROMPT = {
-    1: (
-        "You are a DevOps interviewer. Create a short basic question on "
-        '"{category}" in relation to "{keyword}".\n'
-        "- 1 sentence (≤25 words), answer ≤3 sentences.\n"
-        "- Ask only 1 question. No answer."
-    ),
-
-    2: (
-        "You are a DevOps interviewer. Create a short intermediate question "
-        'on "{category}" in relation to "{keyword}".\n'
-        "- 1 sentence (≤25 words), answer ≤3 sentences.\n"
-        "- Ask only 1 question. No answer."
-    ),
-
-    3: (
-        "You are a DevOps interviewer. Create a short advanced and creative "
-        'question on "{category}" in relation to "{keyword}".\n'
-        "- 1 sentence (≤25 words), answer ≤3 sentences.\n"
-        "- Ask only 1 question. No answer."
-    )
-}
-
-EVAL_PROMPT = (
-    "You are a DevOps teacher.\n"
-    "I will give you an interview question and the user's answer.\n"
-    "The candidate's answer should be brief (≤3 sentences).\n\n"
-    "The question difficulty: {difficulty_label}\n"
-    'Q: "{question}"\n'
-    'A: "{answer}"\n\n'
-    "Tasks:\n"
-    "1. Score 1-10 (10 = excellent).\n"
-    "2. Feedback:\n"
-    "   - 9-10: brief praise.\n"
-    "   - 6-8: what is missing.\n"
-    "   - ≤5: main gap + what to study.\n"
-    "3. Ignore grammar - focus on the core purpose of the answer.\n"
-    "4. Review based on the question difficulty.\n\n"
-    "Format:\n"
-    "Your score: <number>/10\n"
-    "feedback: <text>\n"
-)

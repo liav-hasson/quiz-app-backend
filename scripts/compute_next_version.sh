@@ -98,14 +98,16 @@ case "$MODE" in
       echo "[compute_next_version] Collected commit messages (count=$(echo "$COMMITS" | wc -l))" >&2
     fi
 
-    if [[ -z "${COMMITS// /}" ]]; then
+    # Trim whitespace and check if we have actual commits
+    COMMITS_TRIMMED=$(echo "$COMMITS" | xargs)
+    if [[ -z "$COMMITS_TRIMMED" ]]; then
       # fallback to patch if no commits/messages
       BUMP=patch
       echo "[compute_next_version] No commit messages found; defaulting to patch" >&2
     else
       BUMP=$(decide_bump_from_commits "$COMMITS")
       echo "[compute_next_version] Determined bump: $BUMP" >&2
-      echo "[compute_next_version] Sample commits:\n$COMMITS" >&2
+      echo "[compute_next_version] Sample commits: $COMMITS" >&2
     fi
     ;;
   major|minor|patch)

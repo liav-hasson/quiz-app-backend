@@ -7,7 +7,7 @@ from typing import List, Optional
 # Add the db directory to the path so we can import our controllers
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "db"))
 
-from dbcontroller import DBController, QuizController
+from db.dbcontroller import DBController, QuizController
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,9 @@ class QuizService:
 
         return random.sample(all_keywords, count)
 
-    def get_quiz_questions(self, category: str = None, count: int = 10) -> List[dict]:
+    def get_quiz_questions(
+        self, category: Optional[str] = None, count: int = 10
+    ) -> List[dict]:
         """
         Generate quiz questions with random keywords.
 
@@ -161,7 +163,7 @@ def get_random_keywords_from_category(category: str, count: int = 1) -> List[str
     return _quiz_service.get_random_keywords_from_category(category, count)
 
 
-def get_quiz_questions(category: str = None, count: int = 10) -> List[dict]:
+def get_quiz_questions(category: Optional[str] = None, count: int = 10) -> List[dict]:
     """Generate quiz questions with random keywords."""
     return _quiz_service.get_quiz_questions(category, count)
 

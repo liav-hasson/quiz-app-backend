@@ -1,23 +1,27 @@
 import pymongo
+import os
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
 
 class DBController:
-    def __init__(self, host="mongodb.mongodb.svc.cluster.local", port=27017, db_name="quizdb"):
+    def __init__(self, host=None, port=None, db_name="quizdb"):
         """
         Initialize MongoDB connection
-        
+
         Args:
-            host: MongoDB hostname (default: Kubernetes service DNS)
-            port: MongoDB port (default: 27017)
+            host: MongoDB hostname (default: from env MONGODB_HOST or Kubernetes service DNS)
+            port: MongoDB port (default: from env MONGODB_PORT or 27017)
             db_name: Database name (default: quizdb)
-        
+
         Note: In Kubernetes, use mongodb.mongodb.svc.cluster.local
-              For local development, use localhost
+              For docker-compose, use 'mongodb' (service name)
+              For local development, use 'localhost'
         """
-        self.host = host
-        self.port = port
+        self.host = host or os.environ.get(
+            "MONGODB_HOST", "mongodb.mongodb.svc.cluster.local"
+        )
+        self.port = port or int(os.environ.get("MONGODB_PORT", "27017"))
         self.db_name = db_name
         self.client = None
         self.db = None
@@ -73,7 +77,7 @@ class UserController:
         self,
         username: str,
         hashed_password: str,
-        profile_picture: str = None,
+        profile_picture: Optional[str] = None,
         experience: int = 0,
     ) -> str:
         """
@@ -173,7 +177,7 @@ class UserController:
         return result.modified_count > 0
 
     def get_users_by_experience_range(
-        self, min_exp: int = 0, max_exp: int = None
+        self, min_exp: int = 0, max_exp: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """Get users within experience range"""
         collection = self._get_collection()
@@ -361,7 +365,7 @@ class QuizController:
         return found_items
 
     def get_random_keywords(
-        self, topic: str = None, count: int = 10
+        self, topic: Optional[str] = None, count: int = 10
     ) -> List[Dict[str, Any]]:
         """Get random keywords for quiz generation"""
         collection = self._get_collection()
