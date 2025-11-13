@@ -5,35 +5,48 @@ from typing import Optional, Dict, Any, List
 
 
 class DBController:
-    def __init__(self, host=None, port=None, db_name="quizdb"):
+    def __init__(self, host=None, port=None, db_name="quizdb", username=None, password=None):
         """
         Initialize MongoDB connection
-
+        
         Args:
             host: MongoDB hostname (default: from env MONGODB_HOST or Kubernetes service DNS)
             port: MongoDB port (default: from env MONGODB_PORT or 27017)
             db_name: Database name (default: quizdb)
-
+            username: MongoDB username (default: from env MONGODB_USERNAME)
+            password: MongoDB password (default: from env MONGODB_PASSWORD)
+        
         Note: In Kubernetes, use mongodb.mongodb.svc.cluster.local
               For docker-compose, use 'mongodb' (service name)
               For local development, use 'localhost'
+              Authentication is optional - if username/password not provided, connects without auth
         """
-        self.host = host or os.environ.get(
-            "MONGODB_HOST", "mongodb.mongodb.svc.cluster.local"
-        )
+        self.host = host or os.environ.get("MONGODB_HOST", "mongodb.mongodb.svc.cluster.local")
         self.port = port or int(os.environ.get("MONGODB_PORT", "27017"))
         self.db_name = db_name
+        self.username = username or os.environ.get("MONGODB_USERNAME")
+        self.password = password or os.environ.get("MONGODB_PASSWORD")
         self.client = None
         self.db = None
 
     def connect(self):
         """Connect to MongoDB"""
         try:
-            self.client = pymongo.MongoClient(f"mongodb://{self.host}:{self.port}/")
+            # Build connection string with or without authentication
+            if self.username and self.password:
+                # Authenticated connection
+                connection_string = f"mongodb://{self.username}:{self.password}@{self.host}:{self.port}/{self.db_name}?authSource={self.db_name}"
+                print(f"Connecting to MongoDB at {self.host}:{self.port} as user '{self.username}'")
+            else:
+                # Unauthenticated connection (for local development/testing)
+                connection_string = f"mongodb://{self.host}:{self.port}/"
+                print(f"Connecting to MongoDB at {self.host}:{self.port} (no auth)")
+            
+            self.client = pymongo.MongoClient(connection_string)
             self.db = self.client[self.db_name]
             # Test the connection
             self.client.admin.command("ping")
-            print(f"Connected to MongoDB at {self.host}:{self.port}")
+            print(f"Connected to MongoDB successfully")
             return True
         except Exception as e:
             print(f"Failed to connect to MongoDB: {e}")
@@ -77,7 +90,7 @@ class UserController:
         self,
         username: str,
         hashed_password: str,
-        profile_picture: Optional[str] = None,
+        profile_picture: str = None,
         experience: int = 0,
     ) -> str:
         """
@@ -177,7 +190,7 @@ class UserController:
         return result.modified_count > 0
 
     def get_users_by_experience_range(
-        self, min_exp: int = 0, max_exp: Optional[int] = None
+        self, min_exp: int = 0, max_exp: int = None
     ) -> List[Dict[str, Any]]:
         """Get users within experience range"""
         collection = self._get_collection()
