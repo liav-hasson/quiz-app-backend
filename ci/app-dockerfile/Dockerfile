@@ -37,8 +37,9 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health').read()"
 
-# Change to python directory so imports work correctly
-WORKDIR /app/python
+# Set PYTHONPATH to include both db and python directories
+ENV PYTHONPATH=/app/db:/app/python:$PYTHONPATH
 
-# Run with gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "60", "main:app"]
+# Stay in /app so both db/ and python/ modules can be imported
+# Use python.main:app to specify the module path for gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "60", "python.main:app"]
