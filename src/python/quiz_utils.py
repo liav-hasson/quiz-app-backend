@@ -1,12 +1,15 @@
 import random
 import sys
 import os
+import logging
 from typing import List, Optional
 
 # Add the db directory to the path so we can import our controllers
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "db"))
 
 from db.dbcontroller import DBController, QuizController
+
+logger = logging.getLogger(__name__)
 
 
 class QuizService:
@@ -20,12 +23,15 @@ class QuizService:
     def _initialize_connection(self):
         """Initialize MongoDB connection and controllers"""
         try:
+            logger.info("initializing_mongodb_connection")
             self._db_controller = DBController()
             if self._db_controller.connect():
                 self._quiz_controller = QuizController(self._db_controller)
+                logger.info("mongodb_connection_successful")
             else:
                 raise Exception("Failed to connect to MongoDB")
         except Exception as e:
+            logger.error("mongodb_connection_failed error=%s", str(e))
             print(f"Warning: MongoDB connection failed: {e}")
             print("Quiz functions will not work until database is available.")
             self._quiz_controller = None
@@ -33,6 +39,7 @@ class QuizService:
     def _ensure_connection(self):
         """Ensure we have a valid connection"""
         if not self._quiz_controller:
+            logger.error("no_database_connection_available")
             raise Exception(
                 "No database connection available. Please check MongoDB is running on localhost:27017"
             )
@@ -40,13 +47,19 @@ class QuizService:
 
     def get_categories(self) -> List[str]:
         """Return a list of all categories (topics)."""
+        logger.debug("fetching_categories")
         quiz_controller = self._ensure_connection()
-        return quiz_controller.get_all_topics()
+        categories = quiz_controller.get_all_topics()
+        logger.debug("categories_fetched count=%d", len(categories))
+        return categories
 
     def get_subjects(self, category: str) -> List[str]:
         """Return a list of subjects (subtopics) for a given category."""
+        logger.debug("fetching_subjects category=%s", category)
         quiz_controller = self._ensure_connection()
-        return quiz_controller.get_subtopics_by_topic(category)
+        subjects = quiz_controller.get_subtopics_by_topic(category)
+        logger.debug("subjects_fetched category=%s count=%d", category, len(subjects))
+        return subjects
 
     def get_keywords(self, category: str, subject: str) -> List[str]:
         """Return all keywords for a given category and subject."""
@@ -55,9 +68,15 @@ class QuizService:
 
     def get_random_keyword(self, category: str, subject: str) -> Optional[str]:
         """Return a random keyword for a given category and subject."""
+        logger.debug("fetching_random_keyword category=%s subject=%s", category, subject)
         quiz_controller = self._ensure_connection()
         keywords = quiz_controller.get_keywords_by_topic_subtopic(category, subject)
-        return random.choice(keywords) if keywords else None
+        keyword = random.choice(keywords) if keywords else None
+        if keyword:
+            logger.debug("random_keyword_selected keyword=%s", keyword)
+        else:
+            logger.warning("no_keywords_available category=%s subject=%s", category, subject)
+        return keyword
 
     def get_random_keywords_from_category(
         self, category: str, count: int = 1

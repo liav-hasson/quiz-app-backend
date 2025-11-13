@@ -10,28 +10,50 @@
         "Cgroups (control groups)",
         "Union file system",
         "Monolithic architecture",
-        "Microservice architecture"
+        "Microservice architecture",
+        "Container orchestration",
+        "Container runtime",
+        "OCI (Open Container Initiative)"
+      ],
+      "style_modifiers": [
+        "concept explanation",
+        "comparison",
+        "use case scenario",
+        "advantages and disadvantages",
+        "troubleshooting"
       ]
     },
     "Docker Commands": {
       "keywords": [
-        "cp",
-        "run",
-        "inspect",
-        "ps (-a)",
-        "commit",
-        "start",
-        "build",
-        "stop",
-        "top",
-        "rm",
-        "logs",
-        "attach",
-        "diff",
-        "exec",
-        "info",
-        "kill",
-        "stats"
+        "docker cp",
+        "docker run",
+        "docker inspect",
+        "docker ps",
+        "docker commit",
+        "docker start",
+        "docker build",
+        "docker stop",
+        "docker top",
+        "docker rm",
+        "docker logs",
+        "docker attach",
+        "docker diff",
+        "docker exec",
+        "docker info",
+        "docker kill",
+        "docker stats",
+        "docker images",
+        "docker pull",
+        "docker push",
+        "docker tag",
+        "docker network",
+        "docker volume"
+      ],
+      "style_modifiers": [
+        "command syntax",
+        "practical command construction",
+        "flag and option explanation",
+        "command comparison"
       ]
     },
     "Docker Architecture": {
@@ -50,45 +72,168 @@
         "Docker Swarm",
         ".dockerignore",
         "Docker context"
+      ],
+      "style_modifiers": [
+        "concept explanation",
+        "component interaction",
+        "system architecture explanation",
+        "workflow sequencing",
+        "performance / security",
+        "troubleshooting"
       ]
     }
   },
   "Kubernetes": {
-    "Architecture": {
+    "Core Components": {
       "keywords": [
-        "Container orchestration platform",
-        "Kubernetes (K8s)",
         "Kubernetes API",
         "Container runtime",
-        "Workload",
         "Pod",
         "Deployment",
         "Service",
         "Ingress",
-        "Replica set",
-        "Master node components (control plane)",
+        "ReplicaSet",
+        "Workload",
+        "ConfigMap",
+        "Secret",
+        "Namespace",
+        "Labels & Selectors",
+        "Job",
+        "CronJob"
+      ],
+      "style_modifiers": [
+        "core concept",        
+        "component interaction scenario",
+        "use case implementation",
+        "troubleshooting component failure",
+        "comparison with alternative components",
+        "resource definition and configuration",
+        "scaling considerations",
+        "security and access control",
+        "code snippet"
+      ]
+    },
+    "Control Plane": {
+      "keywords": [
+        "Control plane",
         "kube-apiserver",
         "kube-scheduler",
         "kube-controller-manager",
         "Node controller",
         "Job controller",
         "Endpoints controller",
-        "ServiceAccount & Token controllers",
+        "ServiceAccount controller",
         "etcd",
-        "Worker node components",
+        "cloud-controller-manager"
+      ],
+      "style_modifiers": [
+        "core concept",
+        "failure scenario",
+        "component responsibility",
+        "high availability setup",
+        "performance",
+        "security",
+        "inter-component communication"
+      ]
+    },
+    "Worker Node": {
+      "keywords": [
+        "Worker node",
         "Kubelet",
-        "Podspecs",
         "kube-proxy",
-        "ServiceAccount",
-        "Autoscaling methods",
+        "Container runtime interface (CRI)",
+        "Podspecs",
+        "DaemonSet",
+        "StatefulSet",
+        "Node",
+        "CRI-O",
+        "containerd"
+      ],
+      "style_modifiers": [
+        "core concept",
+        "node failure troubleshooting",
+        "resource allocation scenario",
+        "component interaction flow",
+        "maintenance operations",
+        "performance",
+        "security configuration",
+        "scaling challenges"
+      ]
+    },
+    "Autoscaling & Resources": {
+      "keywords": [
         "Horizontal Pod Autoscaler (HPA)",
         "Vertical Pod Autoscaler (VPA)",
         "Cluster Autoscaler",
-        "Requests vs Limits",
-        "kubectl",
-        "minikube",
-        "kubeadm",
-        "YAML / JSON object configuration files"
+        "Resource requests",
+        "Resource limits",
+        "Resource quotas",
+        "LimitRange",
+        "PodDisruptionBudget (PDB)",
+        "Metrics Server",
+        "Custom metrics",
+        "Quality of Service (QoS)"
+      ],
+      "style_modifiers": [
+        "core concept",
+        "configuration scenario",
+        "performance optimization",
+        "cost optimization analysis",
+        "troubleshooting scaling issues",
+        "resource conflict resolution",
+        "best practices implementation",
+        "metrics interpretation"
+      ]
+    },
+    "Networking": {
+      "keywords": [
+        "Network policies",
+        "CNI (Container Network Interface)",
+        "Service types",
+        "ClusterIP",
+        "NodePort",
+        "LoadBalancer",
+        "ExternalName",
+        "Headless service",
+        "Endpoints",
+        "EndpointSlices",
+        "Ingress controller",
+        "DNS",
+        "CoreDNS",
+        "TargetGroupBinding"
+      ],
+      "style_modifiers": [
+        "connectivity troubleshooting",
+        "security policy implementation",
+        "load balancing configuration",
+        "DNS resolution issues",
+        "network policy design",
+        "service discovery explanation",
+        "ingress controller setup"
+      ]
+    },
+    "Storage": {
+      "keywords": [
+        "PersistentVolume (PV)",
+        "PersistentVolumeClaim (PVC)",
+        "StorageClass",
+        "Volume types",
+        "CSI (Container Storage Interface)",
+        "Dynamic provisioning",
+        "Static provisioning",
+        "Volume snapshots",
+        "Volume expansion",
+        "EmptyDir",
+        "HostPath"
+      ],
+      "style_modifiers": [
+        "storage provisioning scenario",
+        "data persistence troubleshooting",
+        "backup and recovery strategy",
+        "performance optimization",
+        "migration procedures",
+        "access control configuration",
+        "storage class selection criteria"
       ]
     },
     "Commands": {
@@ -106,7 +251,21 @@
         "kubectl cp",
         "kubectl scale",
         "kubectl expose",
-        "kubectl autoscale"
+        "kubectl autoscale",
+        "kubectl port-forward",
+        "kubectl exec",
+        "kubectl patch",
+        "kubectl edit",
+        "kubectl drain",
+        "kubectl cordon",
+        "kubectl uncordon",
+        "kubectl rollout"
+      ],
+      "style_modifiers": [
+        "troubleshooting command sequence",
+        "command comparison and selection",
+        "flag explanation and usage",
+        "debugging workflow"
       ]
     }
   },
@@ -119,19 +278,42 @@
         "Centralized version control system",
         "Distributed version control system",
         "Branch strategy",
-        "Version scheme"
+        "Version scheme",
+        "Git repository",
+        "Remote repository",
+        "Clone",
+        "Fork",
+        "Pull request"
+      ],
+      "style_modifiers": [
+        "fundamental concept explanation",
+        "system comparison and differences",
+        "best practices discussion",
+        "collaboration use case",
+        "tool selection rationale"
       ]
     },
     "Architecture": {
       "keywords": [
         "Working directory",
-        "Staging",
+        "Staging area",
         "Committing",
         "Branching",
         "Merging",
         "HEAD",
         "Merge request",
-        "Merge conflict"
+        "Merge conflict",
+        "Index",
+        "Repository",
+        "Remote tracking branch",
+        "Detached HEAD"
+      ],
+      "style_modifiers": [
+        "core concept",
+        "internal workflow explanation",
+        "conflict resolution strategy",
+        "branch management workflow",
+        "recovery operations"
       ]
     },
     "Commands": {
@@ -147,12 +329,26 @@
         "git rebase",
         "git branch",
         "git log",
-        "git clean"
+        "git clean",
+        "git pull",
+        "git push",
+        "git clone",
+        "git add",
+        "git commit",
+        "git status",
+        "git remote",
+        "git init"
+      ],
+      "style_modifiers": [
+        "core concept",
+        "practical usage scenario",
+        "command comparison and selection",
+        "command flags and optios"
       ]
     }
   },
-  "SQL": {
-    "Structure": {
+  "Databases": {
+    "SQL Structure": {
       "keywords": [
         "Database",
         "DBMS",
@@ -171,9 +367,16 @@
         "Primary key",
         "Foreign key",
         "Data normalization"
+      ],
+      "style_modifiers": [
+        "core concept",
+        "database design scenario",
+        "transaction management",
+        "schema design critique",
+        "relationship modeling"
       ]
     },
-    "Commands": {
+    "SQL Commands": {
       "keywords": [
         "SELECT",
         "DISTINCT",
@@ -190,15 +393,153 @@
         "WHERE",
         "AVG",
         "SUM",
-        "ORDER / GROUP BY",
+        "ORDER BY",
+        "GROUP BY",
         "LIKE",
         "DESC",
         "BETWEEN",
         "JOIN",
         "VIEW",
-        "UNION",
-        "AND",
-        "OR"
+        "UNION"
+      ],
+      "style_modifiers": [
+        "core concept",
+        "code snippet"
+      ]
+    },
+    "SQL Databases": {
+      "keywords": [
+        "PostgreSQL",
+        "MySQL",
+        "Microsoft SQL Server",
+        "Oracle Database",
+        "MongoDB",
+        "Redis",
+        "Cassandra",
+        "MariaDB",
+        "SQLite",
+        "Amazon RDS",
+        "Amazon DynamoDB",
+        "Elasticsearch",
+        "Neo4j",
+        "CouchDB",
+        "InfluxDB"
+      ],
+      "style_modifiers": [
+        "core concept",
+        "database selection rationale",
+        "performance characteristics comparison",
+        "scaling strategy discussion",
+        "managed service considerations",
+        "migration challenges"
+      ]
+    },
+    "NoSQL Architecture": {
+      "keywords": [
+        "NoSQL database",
+        "Document database",
+        "Key-value store",
+        "Column-family store",
+        "Graph database",
+        "CAP theorem",
+        "Eventual consistency",
+        "Strong consistency",
+        "Sharding",
+        "Replication",
+        "Horizontal scaling",
+        "Schema-less design",
+        "Indexing strategies",
+        "Aggregation",
+        "TTL (Time To Live)"
+      ],
+      "style_modifiers": [
+        "core concept",
+        "data modeling scenario",
+        "scaling strategy implementation",
+        "replication strategy"
+      ]
+    },
+    "MongoDB": {
+      "keywords": [
+        "MongoDB",
+        "Collections",
+        "Documents",
+        "BSON",
+        "Replica sets",
+        "Primary node",
+        "Secondary nodes",
+        "Sharding",
+        "mongod",
+        "mongos",
+        "Config servers",
+        "Aggregation framework",
+        "Change streams",
+        "GridFS",
+        "MongoDB Compass",
+        "mongoimport",
+        "mongoexport",
+        "mongodump",
+        "mongorestore"
+      ],
+      "style_modifiers": [
+        "document design scenario",
+        "aggregation pipeline construction",
+        "replica set configuration",
+        "sharding strategy implementation",
+        "performance optimization",
+        "backup and recovery procedures",
+        "data migration workflow"
+      ]
+    },
+    "Redis & Key-Value": {
+      "keywords": [
+        "Redis",
+        "In-memory database",
+        "Key-value pairs",
+        "Redis data structures",
+        "Cache eviction policies",
+        "Redis persistence (RDB/AOF)",
+        "Redis Cluster",
+        "Redis Sentinel",
+        "Pub/Sub",
+        "TTL expiration",
+        "Memcached",
+        "DynamoDB as Key-Value"
+      ],
+      "style_modifiers": [
+        "caching strategy implementation",
+        "data structure selection",
+        "persistence configuration",
+        "cluster setup and management",
+        "performance optimization scenario",
+        "use case suitability analysis",
+        "memory management strategy"
+      ]
+    },
+    "Big Data": {
+      "keywords": [
+        "Hadoop ecosystem",
+        "HDFS",
+        "MapReduce",
+        "Apache Spark",
+        "Data lake",
+        "Data warehouse",
+        "ETL (Extract Transform Load)",
+        "Data pipeline",
+        "Batch processing",
+        "Stream processing",
+        "Apache Kafka",
+        "Data partitioning",
+        "Apache Flink"
+      ],
+      "style_modifiers": [
+        "architecture design scenario",
+        "processing paradigm selection",
+        "scaling strategy implementation",
+        "data pipeline construction",
+        "storage format selection",
+        "performance optimization",
+        "real-time vs batch processing"
       ]
     }
   },
@@ -210,43 +551,151 @@
         "Public cloud",
         "Private cloud",
         "Hybrid cloud",
-        "IaaS / SaaS / PaaS",
+        "IaaS",
+        "PaaS",
+        "SaaS",
         "Shared Responsibility Model",
         "Cloud application",
         "Scalability",
         "Elasticity",
         "GCP",
         "Azure",
-        "OpenStack"
+        "OpenStack",
+        "FinOps",
+        "Cloud cost optimization",
+        "Resource tagging",
+        "Cloud governance"
+      ],
+      "style_modifiers": [
+        "service model comparison",
+        "deployment model selection",
+        "cost optimization scenario",
+        "migration strategy discussion",
+        "shared responsibility application",
+        "scaling requirements analysis",
+        "governance and compliance"
       ]
     },
-    "AWS": {
+    "AWS Basics": {
       "keywords": [
-        "Global data center",
+        "AWS",
+        "Global infrastructure",
         "Region",
         "Availability Zone",
+        "Edge location",
         "AWS Management Console",
+        "AWS CLI",
         "CloudShell",
-        "AMI",
-        "Instance launch template",
+        "AWS SDK",
+        "Local Zones"
+      ],
+      "style_modifiers": [
+        "infrastructure design scenario",
+        "region and AZ selection rationale",
+        "high availability architecture",
+        "access method comparison",
+        "global service optimization",
+        "disaster recovery planning",
+        "multi-region deployment strategy"
+      ]
+    },
+    "AWS Compute & Storage": {
+      "keywords": [
         "EC2",
-        "EFS",
         "EBS",
+        "EFS",
         "S3",
-        "VPC",
-        "IAM",
-        "RDS",
-        "DynamoDB",
-        "CodePipeline",
+        "S3 Glacier",
+        "AMI",
+        "Instance types",
+        "Launch templates",
+        "Snapshots",
         "Elastic Beanstalk",
-        "CloudWatch",
+        "Lambda",
+        "Auto Scaling Groups",
+        "Elastic Load Balancer",
+        "Step Functions"
+      ],
+      "style_modifiers": [
+        "service selection rationale",
+        "cost-performance optimization",
+        "scaling configuration scenario",
+        "storage tier selection",
+        "migration and backup strategy",
+        "performance troubleshooting",
+        "serverless architecture design"
+      ]
+    },
+    "AWS Networking": {
+      "keywords": [
+        "VPC",
+        "Subnets",
+        "Route tables",
+        "Internet Gateway",
+        "NAT Gateway",
+        "Security Groups",
+        "NACLs",
+        "VPC Peering",
+        "Transit Gateway",
+        "Route 53",
+        "Application Load Balancer (ALB)",
+        "Network Load Balancer (NLB)",
+        "CloudFront"
+      ],
+      "style_modifiers": [
+        "network architecture design",
+        "security configuration scenario",
+        "connectivity troubleshooting",
+        "routing and DNS configuration",
+        "load balancer selection",
+        "hybrid cloud connectivity",
+        "performance optimization"
+      ]
+    },
+    "AWS Security & IAM": {
+      "keywords": [
+        "IAM",
+        "IAM Roles",
+        "IAM Policies",
+        "Identity-based policies",
+        "Resource-based policies",
+        "AWS Organizations",
+        "Service Control Policies (SCP)",
         "AWS Shield",
         "AWS WAF",
-        "Route 53",
-        "Load balancer",
-        "Lambda",
+        "KMS",
+        "Secrets Manager",
+        "Security Token Service (STS)"
+      ],
+      "style_modifiers": [
+        "access control implementation",
+        "policy creation and troubleshooting",
+        "security best practices",
+        "compliance scenario",
+        "encryption configuration",
+        "organizational governance",
+        "incident response planning"
+      ]
+    },
+    "AWS Data & DevOps": {
+      "keywords": [
+        "RDS",
+        "DynamoDB",
+        "Aurora",
+        "Redshift",
+        "ElastiCache",
+        "CloudWatch",
+        "CloudTrail",
         "ECR",
-        "CloudFront"
+        "Systems Manager"
+      ],
+      "style_modifiers": [
+        "database service selection",
+        "pipeline construction scenario",
+        "monitoring and alerting setup",
+        "data migration strategy",
+        "performance monitoring",
+        "disaster recovery implementation"
       ]
     }
   },
@@ -254,8 +703,10 @@
     "Basics": {
       "keywords": [
         "Principle of least privilege",
-        "Authentication / Authorization",
-        "Asymmetric vs Symmetric Encryption",
+        "Authentication",
+        "Authorization",
+        "Asymmetric encryption",
+        "Symmetric encryption",
         "SSH Keys",
         "SSH Security Configurations",
         "Access Token",
@@ -264,32 +715,209 @@
         "OIDC",
         "Opaque Tokens",
         "JWT Tokens",
-        "AWS Identity/Resource-Based Policies",
-        "RBAC / ABAC"
+        "RBAC",
+        "ABAC",
+        "MFA (Multi-Factor Authentication)",
+        "Certificate-based authentication",
+        "API Keys",
+        "Secrets rotation"
+      ],
+      "style_modifiers": [
+        "authentication flow scenario",
+        "authorization model implementation",
+        "encryption method selection",
+        "security principle application",
+        "token type comparison",
+        "access control design",
+        "credential management best practices"
       ]
     },
-    "SSL": {
+    "SSL/TLS": {
       "keywords": [
         "SSL / TLS",
-        "Handshake Process",
+        "TLS Handshake Process",
         "SAN (Subject Alternative Name)",
         "SSL Certificate types",
-        "Private / Public CA ",
+        "Private CA",
+        "Public CA",
         "SSL Validation",
         "SSL Validation Levels",
         "Certificate Chain",
         "Code Signing Certificates",
         "Digital Signatures",
-        "Expiration and Renewal",
+        "Certificate Expiration",
         "CRL",
         "OCSP",
-        "PFS (Perfect Forward Secrecy)",
-        "Man-in-the-Middle (MitM)"
+        "PFS (Perfect Forward Secrecy)"
+      ],
+      "style_modifiers": [
+        "certificate configuration scenario",
+        "handshake process explanation",
+        "validation and trust chain",
+        "security vulnerability analysis",
+        "certificate lifecycle management",
+        "encryption protocol selection",
+        "troubleshooting connection issues"
+      ]
+    },
+    "Cloud Security": {
+      "keywords": [
+        "Cloud SIEM",
+        "CASB (Cloud Access Security Broker)",
+        "Cloud workload protection",
+        "Container security scanning",
+        "Secrets management",
+        "Service mesh security",
+        "mTLS (mutual TLS)",
+        "Cloud compliance (SOC2, ISO 27001)",
+        "Data encryption at rest",
+        "Data encryption in transit",
+        "CSPM (Cloud Security Posture Management)",
+        "Vulnerability scanning"
+      ],
+      "style_modifiers": [
+        "zero trust implementation",
+        "compliance requirement mapping",
+        "security tool selection rationale",
+        "workload protection configuration",
+        "encryption strategy design",
+        "security posture assessment",
+        "incident response planning"
+      ]
+    },
+    "Network Security": {
+      "keywords": [
+        "Firewall rules",
+        "IDS/IPS",
+        "VPN tunneling",
+        "Network segmentation",
+        "DMZ",
+        "DDoS protection",
+        "Port security",
+        "Packet filtering",
+        "Proxy servers",
+        "Bastion host",
+        "Jump box",
+        "WAF rules"
+      ],
+      "style_modifiers": [
+        "firewall rule configuration",
+        "network segmentation design",
+        "intrusion detection scenario",
+        "access control implementation",
+        "VPN tunnel configuration",
+        "DDoS mitigation strategy",
+        "secure network architecture"
+      ]
+    },
+    "Backups": {
+      "keywords": [
+        "Backup strategy",
+        "Full backup",
+        "Incremental backup",
+        "Differential backup",
+        "Backup retention policy",
+        "Backup encryption",
+        "Offsite backup",
+        "Cloud backup",
+        "Backup verification",
+        "Backup automation",
+        "Snapshot backups",
+        "Continuous data protection",
+        "Backup windows"
+      ],
+      "style_modifiers": [
+        "backup strategy design",
+        "recovery point calculation",
+        "encryption and security configuration",
+        "automation implementation",
+        "storage tier selection",
+        "verification and testing procedures",
+        "cost optimization while maintaining safety"
+      ]
+    },
+    "Disaster Recovery": {
+      "keywords": [
+        "Disaster recovery plan (DRP)",
+        "Business continuity",
+        "RTO (Recovery Time Objective)",
+        "RPO (Recovery Point Objective)",
+        "Failover",
+        "Failback",
+        "Hot site",
+        "Warm site",
+        "Cold site",
+        "DR testing",
+        "DR runbook",
+        "Geographic redundancy",
+        "Data replication",
+        "Recovery procedures"
+      ],
+      "style_modifiers": [
+        "RTO/RPO calculation scenario",
+        "recovery strategy selection",
+        "failover procedure design",
+        "testing methodology implementation",
+        "geographic redundancy planning",
+        "runbook creation and validation",
+        "business continuity planning"
+      ]
+    },
+    "Policy as Code": {
+      "keywords": [
+        "Policy as Code (PaC)",
+        "Open Policy Agent (OPA)",
+        "Rego policy language",
+        "Sentinel (HashiCorp)",
+        "Kyverno policies",
+        "Policy validation",
+        "Policy enforcement",
+        "Compliance as Code",
+        "Security policies",
+        "Governance policies",
+        "Policy testing",
+        "Policy versioning",
+        "Policy automation"
+      ],
+      "style_modifiers": [
+        "policy rule creation scenario",
+        "compliance as code implementation",
+        "policy testing and validation",
+        "tool selection comparison",
+        "integration with CI/CD pipeline",
+        "policy enforcement strategy",
+        "governance automation design"
+      ]
+    },
+    "Security Testing": {
+      "keywords": [
+        "Security testing",
+        "SAST (Static Application Security Testing)",
+        "DAST (Dynamic Application Security Testing)",
+        "Penetration testing",
+        "Vulnerability assessment",
+        "Security scanning",
+        "Threat modeling",
+        "Code review for security",
+        "Dependency scanning",
+        "Container image scanning",
+        "Fuzz testing",
+        "Red team/Blue team",
+        "Bug bounty programs"
+      ],
+      "style_modifiers": [
+        "testing methodology selection",
+        "vulnerability assessment scenario",
+        "tool implementation strategy",
+        "results interpretation and prioritization",
+        "testing integration in SDLC",
+        "penetration testing scope definition",
+        "remediation workflow design"
       ]
     }
   },
-  "DevOps": {
-    "Basics": {
+  "CI/CD": {
+    "DevOps Methodology": {
       "keywords": [
         "DevOps",
         "SDLC",
@@ -306,26 +934,237 @@
         "Orchestration",
         "Continuous monitoring",
         "Microservices",
-        "Shift left"
+        "Shift left",
+        "GitFlow",
+        "Trunk-based development",
+        "Feature flags",
+        "Chaos engineering"
+      ],
+      "style_modifiers": [
+        "methodology comparison and selection",
+        "cultural transformation scenario",
+        "workflow implementation strategy",
+        "team collaboration optimization",
+        "methodology benefits and challenges",
+        "best practices application"
       ]
     },
-    "CI/CD": {
+    "CI Basics": {
       "keywords": [
         "Continuous Integration (CI)",
         "Pipeline",
         "Pipeline stages",
-        "Build server / CI server",
+        "Build server",
+        "CI server",
         "Pipeline as code",
         "Continuous Testing",
-        "Continuous Delivery / Continuous Deployment (CD)",
-        "Automated Deployment",
-        "Deployment Strategies"
+        "Jenkins",
+        "GitLab CI",
+        "GitHub Actions",
+        "CircleCI",
+        "Travis CI",
+        "Bamboo",
+        "TeamCity",
+        "Azure DevOps Pipelines"
+      ],
+      "style_modifiers": [
+        "pipeline design and configuration",
+        "tool selection rationale",
+        "integration strategy implementation",
+        "workflow automation scenario",
+        "testing integration approach",
+        "build optimization techniques",
+        "troubleshooting pipeline failures"
+      ]
+    },
+    "CI Artifacting": {
+      "keywords": [
+        "Build artifacts",
+        "Artifact versioning",
+        "Artifact retention",
+        "Artifact signing",
+        "Artifact promotion",
+        "Release artifacts",
+        "Artifact repository",
+        "JFrog Artifactory",
+        "Nexus Repository",
+        "Docker Registry",
+        "Container registry",
+        "npm registry",
+        "PyPI",
+        "Maven Central",
+        "NuGet Gallery",
+        "GitHub Packages",
+        "GitLab Package Registry",
+        "AWS CodeArtifact",
+        "Azure Artifacts"
+      ],
+      "style_modifiers": [
+        "artifact management strategy",
+        "versioning scheme implementation",
+        "repository selection and configuration",
+        "security and signing workflow",
+        "promotion pipeline design",
+        "retention policy planning",
+        "storage optimization approach"
+      ]
+    },
+    "GitOps Basics": {
+      "keywords": [
+        "GitOps principles",
+        "Declarative infrastructure",
+        "Git as single source of truth",
+        "Pull-based deployment",
+        "Push-based deployment",
+        "Reconciliation loop",
+        "Drift detection",
+        "Self-healing systems",
+        "Infrastructure versioning",
+        "Automated rollback",
+        "Observability",
+        "Audit trail",
+        "ArgoCD",
+        "Flux",
+        "FluxCD v2",
+        "Jenkins X",
+        "Kustomize"
+      ],
+      "style_modifiers": [
+        "GitOps workflow implementation",
+        "deployment model selection",
+        "reconciliation strategy design",
+        "drift management approach",
+        "tool comparison and selection",
+        "migration to GitOps planning",
+        "observability integration"
+      ]
+    },
+    "ArgoCD Architecture": {
+      "keywords": [
+        "Application Controller",
+        "Repository Server",
+        "API Server",
+        "Redis",
+        "ApplicationSet",
+        "App of Apps pattern",
+        "Sync strategies",
+        "Sync phases",
+        "Sync waves",
+        "Sync hooks",
+        "Health status",
+        "ArgoCD CRDs",
+        "Projects",
+        "Multi-tenancy"
+      ],
+      "style_modifiers": [
+        "component interaction explanation",
+        "architecture design scenario",
+        "sync strategy implementation",
+        "multi-tenancy configuration",
+        "pattern application use case",
+        "high availability setup",
+        "troubleshooting component issues"
+      ]
+    },
+    "ArgoCD Commands": {
+      "keywords": [
+        "argocd app create",
+        "argocd app sync",
+        "argocd app get",
+        "argocd app list",
+        "argocd app delete",
+        "argocd app set",
+        "argocd app diff",
+        "argocd app rollback",
+        "argocd app history",
+        "argocd repo add",
+        "argocd cluster add",
+        "argocd login",
+        "argocd project create",
+        "argocd app wait",
+        "argocd app manifests"
+      ],
+      "style_modifiers": [
+        "command usage and syntax",
+        "command flags and options",
+        "cluster management task"
+      ]
+    },
+    "ArgoCD Concepts": {
+      "keywords": [
+        "Application manifest",
+        "Sync status",
+        "Out of sync",
+        "Sync policy",
+        "Auto-sync",
+        "Self-heal",
+        "Prune resources",
+        "Refresh",
+        "SSO integration",
+        "Notification system",
+        "Resource hooks"
+      ],
+      "style_modifiers": [
+        "concept definition and usage",
+        "configuration scenario",
+        "automation strategy design",
+        "resource management workflow"
+      ]
+    },
+    "Helm Commands": {
+      "keywords": [
+        "helm install",
+        "helm upgrade",
+        "helm rollback",
+        "helm list",
+        "helm uninstall",
+        "helm repo add",
+        "helm repo update",
+        "helm search repo",
+        "helm search hub",
+        "helm show",
+        "helm create",
+        "helm package",
+        "helm dependency",
+        "helm test",
+        "helm get values"
+      ],
+      "style_modifiers": [
+        "command syntax and usage",
+        "troubleshooting command sequence",
+        "command flags and options"
+      ]
+    },
+    "Helm Architecture": {
+      "keywords": [
+        "Helm chart",
+        "Chart.yaml",
+        "values.yaml",
+        "templates/ directory",
+        "Release",
+        "Chart repository",
+        "Helm Hub (Artifact Hub)",
+        "Chart dependencies",
+        "Helm hooks",
+        "Subchart",
+        "Parent chart",
+        "Chart versioning",
+        ".helmignore"
+      ],
+      "style_modifiers": [
+        "chart structure explanation",
+        "templating strategy design",
+        "versioning scheme implementation",
+        "hook implementation scenario",
+        "chart organization best practices",
+        "release management workflow"
       ]
     }
   },
   "IaC": {
     "Ansible": {
       "keywords": [
+        "Ansible",
         "Control node",
         "Managed node",
         "Host inventory",
@@ -333,7 +1172,6 @@
         "Ad hoc commands",
         "Playbook",
         "Task",
-        "Terraform Modules",
         "Idempotence",
         "Role",
         "Block",
@@ -341,15 +1179,21 @@
         "Handlers",
         "Strategy",
         "Ansible debugger"
+      ],
+      "style_modifiers": [
+        "concept definition",
+        "playbook design scenario",
+        "idempotent task implementation",
+        "role organization strategy",
+        "inventory management approach"
       ]
     },
-    "Terraform Basics": {
+    "Terraform": {
       "keywords": [
         "Terraform",
         "Immutable infrastructure paradigm",
         "Providers",
         "Resources",
-        "HCL",
         "Terraform configuration",
         "State file",
         "Terraform backend",
@@ -359,27 +1203,711 @@
         "Output values",
         "Local values",
         "Validation block",
-        "count and for_each",
+        "count",
+        "for_each",
         "Conditional Expressions",
         "Terraform Modules",
         "Data sources",
         "Dynamic blocks",
         "Provisioners",
         "local-exec",
-        "remote-exec",
-        "Terraform Registry"
+        "remote-exec"
+      ],
+      "style_modifiers": [
+        "concept explanation and usage",
+        "resource configuration scenario",
+        "state management strategy",
+        "module design best practices",
+        "comparison with alternatives",
+        "conditional logic implementation",
+        "troubleshooting state conflicts"
       ]
     },
     "Terraform Commands": {
       "keywords": [
-        "plan",
-        "init",
-        "validate",
-        "show",
-        "destroy",
-        "apply",
-        "fmt",
-        "state list"
+        "terraform plan",
+        "terraform init",
+        "terraform validate",
+        "terraform show",
+        "terraform destroy",
+        "terraform apply",
+        "terraform fmt",
+        "terraform state list",
+        "terraform import",
+        "terraform output",
+        "terraform refresh",
+        "terraform taint",
+        "terraform workspace",
+        "terraform graph",
+        "terraform console"
+      ],
+      "style_modifiers": [
+        "command syntax and usage",
+        "command flags and options",
+        "state manipulation operations"
+      ]
+    },
+    "CloudFormation": {
+      "keywords": [
+        "AWS CloudFormation",
+        "Stack",
+        "Template",
+        "Resources section",
+        "Parameters",
+        "Outputs",
+        "Mappings",
+        "Conditions",
+        "Intrinsic functions",
+        "Change sets",
+        "StackSets",
+        "Drift detection"
+      ],
+      "style_modifiers": [
+        "template structure explanation",
+        "stack design scenario",
+        "intrinsic function usage",
+        "parameter configuration approach",
+        "cross-stack reference implementation",
+        "change set validation workflow",
+        "multi-region deployment with StackSets"
+      ]
+    },
+    "Pulumi": {
+      "keywords": [
+        "Pulumi",
+        "Infrastructure as Software",
+        "Pulumi stack",
+        "Pulumi state",
+        "Pulumi backend",
+        "Programming languages support",
+        "Pulumi resources",
+        "Pulumi outputs",
+        "Pulumi config",
+        "Pulumi preview"
+      ],
+      "style_modifiers": [
+        "concept and architecture explanation",
+        "multi-language implementation scenario",
+        "stack configuration strategy",
+        "state management approach",
+        "resource definition in code",
+        "testing infrastructure code",
+        "comparison with alternatives"
+      ]
+    }
+  },
+  "Service Mesh": {
+    "Basics": {
+      "keywords": [
+        "Service mesh",
+        "Sidecar proxy",
+        "Control plane",
+        "Data plane",
+        "Service discovery",
+        "Load balancing strategies",
+        "Circuit breaking",
+        "Retry policies",
+        "Timeout policies",
+        "Fault injection",
+        "Observability",
+        "Distributed tracing"
+      ],
+      "style_modifiers": [
+        "core concept and architecture",
+        "service mesh adoption rationale",
+        "traffic management scenario",
+        "resilience pattern implementation",
+        "observability configuration",
+        "performance and security trade-offs",
+        "troubleshooting mesh connectivity"
+      ]
+    },
+    "Istio": {
+      "keywords": [
+        "Istio architecture",
+        "Envoy proxy",
+        "Istiod",
+        "Pilot",
+        "Virtual Service",
+        "Destination Rule",
+        "Gateway",
+        "Service Entry",
+        "Sidecar resource",
+        "Traffic management",
+        "mTLS in Istio",
+        "Telemetry v2",
+        "Istio ingress",
+        "Istio egress"
+      ],
+      "style_modifiers": [
+        "component interaction explanation",
+        "traffic routing configuration",
+        "security policy implementation",
+        "canary deployment scenario",
+        "mTLS configuration approach",
+        "gateway setup and management",
+        "troubleshooting traffic flow",
+        "observability integration"
+      ]
+    },
+    "Policy Engines": {
+      "keywords": [
+        "Kyverno",
+        "OPA (Open Policy Agent)",
+        "Policy as Code",
+        "Admission controller",
+        "Validating webhook",
+        "Mutating webhook",
+        "Validation policies",
+        "Mutation policies",
+        "Generation policies",
+        "ClusterPolicy",
+        "Policy reports",
+        "Background scanning",
+        "Policy exceptions"
+      ],
+      "style_modifiers": [
+        "policy engine architecture",
+        "policy rule creation scenario",
+        "validation vs mutation comparison",
+        "compliance enforcement implementation",
+        "policy testing strategy",
+        "exception handling approach",
+        "integration with CI/CD pipeline",
+        "troubleshooting policy violations"
+      ]
+    }
+  },
+  "Networking": {
+    "Protocols": {
+      "keywords": [
+        "TCP",
+        "UDP",
+        "HTTP",
+        "HTTPS",
+        "gRPC",
+        "WebSocket",
+        "ICMP",
+        "ARP",
+        "DHCP",
+        "DNS protocol",
+        "FTP",
+        "SSH protocol",
+        "SMTP",
+        "SNMP"
+      ],
+      "style_modifiers": [
+        "protocol explanation and characteristics",
+        "protocol comparison and selection",
+        "performance and reliability",
+        "troubleshooting connectivity issues"
+      ]
+    },
+    "OSI Model": {
+      "keywords": [
+        "Application layer (Layer 7)",
+        "Presentation layer (Layer 6)",
+        "Session layer (Layer 5)",
+        "Transport layer (Layer 4)",
+        "Network layer (Layer 3)",
+        "Data link layer (Layer 2)",
+        "Physical layer (Layer 1)",
+        "Encapsulation",
+        "De-encapsulation",
+        "PDU (Protocol Data Unit)"
+      ],
+      "style_modifiers": [
+        "layer responsibility and function",
+        "protocol mapping to layers",
+        "troubleshooting layer-specific issues"
+      ]
+    },
+    "TCP/IP": {
+      "keywords": [
+        "Three-way handshake",
+        "TCP flags (SYN, ACK, FIN)",
+        "Connection establishment",
+        "Connection termination",
+        "TCP window size",
+        "Congestion control",
+        "Flow control",
+        "TCP segments",
+        "Retransmission timeout",
+        "Keep-alive packets",
+        "TCP state diagram",
+        "Half-open connection",
+        "Full-duplex"
+      ],
+      "style_modifiers": [
+        "concept explanation and usage",
+        "troubleshooting connection issues"
+      ]
+    },
+    "HTTP": {
+      "keywords": [
+        "HTTP methods",
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "PATCH",
+        "OPTIONS",
+        "HEAD",
+        "HTTP status codes",
+        "HTTP headers",
+        "Cookies",
+        "HTTP/2",
+        "HTTP/3",
+        "CORS",
+        "Content negotiation"
+      ],
+      "style_modifiers": [
+        "concept explanation and usage",
+        "RESTful API design consideration",
+        "caching strategy configuration",
+        "security header implementation"
+      ]
+    },
+    "API": {
+      "keywords": [
+        "RESTful API",
+        "GraphQL",
+        "gRPC API",
+        "API Gateway",
+        "API versioning",
+        "Rate limiting",
+        "API authentication",
+        "API authorization",
+        "API documentation",
+        "OpenAPI Specification",
+        "Swagger",
+        "Webhook"
+      ],
+      "style_modifiers": [
+        "concept explanation and usage",
+        "API design pattern selection",
+        "architecture implementation scenario",
+        "authentication and authorization strategy",
+        "performance and scalability optimization"
+      ]
+    },
+    "DNS": {
+      "keywords": [
+        "DNS resolution",
+        "A record",
+        "AAAA record",
+        "CNAME record",
+        "MX record",
+        "TXT record",
+        "PTR record",
+        "/etc/resolve.conf",
+        "NS record",
+        "SOA record",
+        "Authoritative nameserver",
+        "Recursive resolver",
+        "DNS cache",
+        "TTL (Time To Live)",
+        "DNS zones",
+        "DNSSEC"
+      ],
+      "style_modifiers": [
+        "concept explanation and usage",
+        "resolution process explanation",
+        "zone management scenario",
+        "TTL optimization strategy",
+        "troubleshooting resolution failures",
+        "DNSSEC implementation approach",
+        "caching behavior analysis",
+        "high availability DNS design"
+      ]
+    },
+    "Commands": {
+      "keywords": [
+        "ping",
+        "traceroute",
+        "netstat",
+        "nslookup",
+        "dig",
+        "curl",
+        "wget",
+        "telnet",
+        "ssh",
+        "nc (netcat)",
+        "tcpdump",
+        "wireshark",
+        "iptables",
+        "ip route",
+        "ifconfig"
+      ],
+      "style_modifiers": [
+        "command syntax and usage",
+        "troubleshooting workflow scenario",
+        "command flags and options",
+        "output interpretation and analysis",
+        "diagnostic command sequence",
+        "network debugging approach",
+        "practical troubleshooting example"
+      ]
+    }
+  },
+  "Solutions Architecture": {
+    "Design Patterns": {
+      "keywords": [
+        "Microservices architecture",
+        "Event-driven architecture",
+        "Serverless architecture",
+        "N-tier architecture",
+        "CQRS",
+        "Event sourcing",
+        "Saga pattern",
+        "Strangler Fig pattern",
+        "Anti-corruption layer",
+        "Bulkhead pattern",
+        "Queue-based load leveling",
+        "Cache-aside pattern",
+        "Circuit breaker pattern",
+        "Retry pattern"
+      ],
+      "style_modifiers": [
+        "pattern explanation and use case",
+        "implementation scenario and design",
+        "pattern selection rationale",
+        "trade-offs and considerations",
+        "migration strategy to pattern",
+        "real-world application example",
+        "anti-pattern identification",
+        "scalability and resilience benefits"
+      ]
+    },
+    "Cloud Architecture": {
+      "keywords": [
+        "Multi-cloud strategy",
+        "Cloud-native architecture",
+        "AWS Well-Architected Framework",
+        "Cost optimization",
+        "Performance efficiency",
+        "Reliability pillar",
+        "Security pillar",
+        "Operational excellence",
+        "High availability (HA)",
+        "Disaster recovery (DR)",
+        "RTO (Recovery Time Objective)",
+        "RPO (Recovery Point Objective)",
+        "Fault tolerance",
+        "Geographic distribution",
+        "Sustainability pillar"
+      ],
+      "style_modifiers": [
+        "pillar application and assessment",
+        "architecture design scenario",
+        "HA and DR strategy implementation",
+        "cost-performance optimization",
+        "multi-region deployment planning",
+        "resilience pattern implementation",
+        "framework principle application",
+        "migration and modernization approach"
+      ]
+    },
+    "Hybrid Architecture": {
+      "keywords": [
+        "Hybrid cloud architecture",
+        "On-premises integration",
+        "Cloud bursting",
+        "Data residency requirements",
+        "Latency considerations",
+        "Hybrid connectivity",
+        "AWS Direct Connect",
+        "Azure ExpressRoute",
+        "VPN tunnels",
+        "Edge computing",
+        "Hybrid identity management",
+        "Workload placement"
+      ],
+      "style_modifiers": [
+        "hybrid architecture design scenario",
+        "connectivity solution selection",
+        "workload placement strategy",
+        "compliance and data residency",
+        "performance optimization approach",
+        "identity and access management",
+        "cost and latency trade-offs",
+        "migration and integration planning"
+      ]
+    },
+    "On-Premises": {
+      "keywords": [
+        "Data center infrastructure",
+        "Bare metal servers",
+        "Hypervisor",
+        "VMware vSphere",
+        "Proxmox",
+        "KVM (Kernel-based Virtual Machine)",
+        "Storage arrays",
+        "SAN (Storage Area Network)",
+        "NAS (Network Attached Storage)",
+        "Rack units (U)",
+        "Colocation facility"
+      ],
+      "style_modifiers": [
+        "infrastructure component explanation",
+        "virtualization platform comparison",
+        "capacity planning scenario",
+        "storage architecture design",
+        "high availability configuration",
+        "migration to cloud considerations",
+        "hardware selection rationale",
+        "disaster recovery planning"
+      ]
+    }
+  },
+  "Monitoring": {
+    "Observability Concepts": {
+      "keywords": [
+        "Observability",
+        "Three pillars of observability",
+        "Metrics",
+        "Logs",
+        "Traces",
+        "SLI (Service Level Indicator)",
+        "SLO (Service Level Objective)",
+        "SLA (Service Level Agreement)",
+        "Error budget",
+        "MTTR (Mean Time To Recovery)",
+        "MTTF (Mean Time To Failure)",
+        "Alerting",
+        "APM (Application Performance Monitoring)",
+        "Real User Monitoring (RUM)",
+        "Synthetic monitoring"
+      ],
+      "style_modifiers": [
+        "Define the following observability concept"
+      ]
+    },
+    "Prometheus Stack": {
+      "keywords": [
+        "Prometheus",
+        "PromQL",
+        "Prometheus exporters",
+        "Time-series database",
+        "Scraping",
+        "Service discovery",
+        "Alertmanager",
+        "Grafana",
+        "Recording rules",
+        "Alerting rules",
+        "Pushgateway",
+        "Node exporter",
+        "Blackbox exporter",
+        "Federation"
+      ],
+      "style_modifiers": [
+        "Explain the following Prometheus stack component"
+      ]
+    },
+    "ELK Stack": {
+      "keywords": [
+        "ELK Stack",
+        "Elasticsearch",
+        "Logstash",
+        "Kibana",
+        "Filebeat",
+        "Metricbeat",
+        "Beats family",
+        "Index patterns",
+        "Elasticsearch queries",
+        "Kibana dashboards",
+        "Log aggregation",
+        "Log parsing",
+        "Elastic APM"
+      ],
+      "style_modifiers": [
+        "Define the following ELK stack component"
+      ]
+    },
+    "Logging": {
+      "keywords": [
+        "Centralized logging",
+        "Log levels (DEBUG, INFO, WARN, ERROR)",
+        "Structured logging",
+        "Log rotation",
+        "Log retention",
+        "Syslog",
+        "Fluentd",
+        "Fluent Bit",
+        "Log shipping",
+        "Log correlation",
+        "Log analysis",
+        "Application logs"
+      ],
+      "style_modifiers": [
+        "Explain the following logging concept"
+      ]
+    },
+    "Monitoring Tools": {
+      "keywords": [
+        "Datadog",
+        "New Relic",
+        "Splunk",
+        "Jaeger",
+        "Zipkin",
+        "OpenTelemetry",
+        "CloudWatch",
+        "Azure Monitor",
+        "Nagios",
+        "Zabbix",
+        "Icinga",
+        "PagerDuty",
+        "VictorOps"
+      ],
+      "style_modifiers": [
+        "Describe the following monitoring tool"
+      ]
+    },
+    "Metrics & Dashboards": {
+      "keywords": [
+        "Time-series metrics",
+        "Counter",
+        "Gauge",
+        "Histogram",
+        "Summary",
+        "Cardinality",
+        "Dashboard design",
+        "Golden signals",
+        "RED metrics",
+        "USE method",
+        "Custom metrics",
+        "Composite metrics",
+        "Grafana dashboards",
+        "Threshold alerts"
+      ],
+      "style_modifiers": [
+        "Define the following metrics or dashboard concept"
+      ]
+    }
+  },
+  "Bash": {
+    "System Monitoring": {
+      "keywords": [
+        "top",
+        "htop",
+        "ps aux",
+        "ps -ef",
+        "pgrep",
+        "pkill",
+        "kill",
+        "killall",
+        "nice",
+        "renice",
+        "uptime",
+        "free -h",
+        "df -h",
+        "du -h",
+        "iostat",
+        "vmstat",
+        "lsof",
+        "strace",
+        "netstat",
+        "ss",
+        "mpstat",
+        "pidstat"
+      ],
+      "style_modifiers": [
+        "command explenation",
+        "command comparison and selection",
+        "command flags and options",
+        "command output",
+        "one line code syntax challange"
+      ]
+    },
+    "Text Manipulation": {
+      "keywords": [
+        "grep",
+        "egrep",
+        "sed",
+        "awk",
+        "cut",
+        "tr",
+        "sort",
+        "uniq",
+        "head",
+        "tail",
+        "wc",
+        "column",
+        "join",
+        "comm",
+        "diff",
+        "patch"
+      ],
+      "style_modifiers": [
+        "command explenation",
+        "command comparison and selection",
+        "command flags and options",
+        "command output",
+        "one line code syntax challange"
+      ]
+    },
+    "System and User Management": {
+      "keywords": [
+        "journalctl",
+        "systemctl",
+        "service",
+        "systemd",
+        "useradd",
+        "usermod",
+        "userdel",
+        "groupadd",
+        "groupmod",
+        "groupdel",
+        "passwd",
+        "chage",
+        "id",
+        "whoami",
+        "who",
+        "w",
+        "last",
+        "sudo",
+        "su",
+        "chmod",
+        "chown",
+        "chgrp",
+        "umask"
+      ],
+      "style_modifiers": [
+        "command comparison and selection",
+        "command flags and options",
+        "command output",
+        "command explenation"
+      ]
+    },
+    "File Operations": {
+      "keywords": [
+        "find",
+        "xargs",
+        "locate",
+        "which",
+        "whereis",
+        "tar",
+        "gzip",
+        "gunzip",
+        "zip",
+        "unzip",
+        "curl",
+        "wget",
+        "<",
+        "<<",
+        "<<<",
+        "mkdir",
+        "rm",
+        "cp",
+        "mv",
+        "ln"
+      ],
+      "style_modifiers": [
+        "command comparison and selection",
+        "command flags and options",
+        "command output",
+        "command use case",
+        "one line code syntax challange"
       ]
     }
   }

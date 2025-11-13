@@ -22,3 +22,6 @@ instance/
 # Environment
 .env
 .env.local
+
+# no lawsuit today
+db.json

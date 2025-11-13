@@ -1,12 +1,25 @@
 import pymongo
+import os
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
 
 class DBController:
-    def __init__(self, host="localhost", port=27017, db_name="quizapp"):
-        self.host = host
-        self.port = port
+    def __init__(self, host=None, port=None, db_name="quizdb"):
+        """
+        Initialize MongoDB connection
+        
+        Args:
+            host: MongoDB hostname (default: from env MONGODB_HOST or Kubernetes service DNS)
+            port: MongoDB port (default: from env MONGODB_PORT or 27017)
+            db_name: Database name (default: quizdb)
+        
+        Note: In Kubernetes, use mongodb.mongodb.svc.cluster.local
+              For docker-compose, use 'mongodb' (service name)
+              For local development, use 'localhost'
+        """
+        self.host = host or os.environ.get("MONGODB_HOST", "mongodb.mongodb.svc.cluster.local")
+        self.port = port or int(os.environ.get("MONGODB_PORT", "27017"))
         self.db_name = db_name
         self.client = None
         self.db = None
@@ -26,7 +39,7 @@ class DBController:
 
     def disconnect(self):
         """Disconnect from MongoDB"""
-        if self.client:
+        if self.client is not None:
             self.client.close()
             print("Disconnected from MongoDB")
 
@@ -36,7 +49,7 @@ class DBController:
 
     def get_collection(self, collection_name):
         """Get a specific collection"""
-        if self.db:
+        if self.db is not None:
             return self.db[collection_name]
         else:
             raise Exception("Not connected to database")
@@ -50,8 +63,8 @@ class UserController:
 
     def _get_collection(self):
         """Get users collection, ensuring connection exists"""
-        if not self.collection:
-            if not self.db_controller.db:
+        if self.collection is None:
+            if self.db_controller.db is None:
                 raise Exception(
                     "Database not connected. Call db_controller.connect() first."
                 )
@@ -193,8 +206,8 @@ class QuizController:
 
     def _get_collection(self):
         """Get quiz collection, ensuring connection exists"""
-        if not self.collection:
-            if not self.db_controller.db:
+        if self.collection is None:
+            if self.db_controller.db is None:
                 raise Exception(
                     "Database not connected. Call db_controller.connect() first."
                 )
