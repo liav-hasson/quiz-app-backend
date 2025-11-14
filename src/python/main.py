@@ -51,22 +51,31 @@ def initialize_database():
         topics = quiz_controller.get_all_topics()
 
         if not topics:
-            print("WARNING: No quiz data found in MongoDB!")
-            print("Attempting to migrate data from db.json...")
+            # Check if auto-migration is enabled (default: true for backward compatibility)
+            auto_migrate = os.getenv('AUTO_MIGRATE_DB', 'true').lower() == 'true'
+            
+            if auto_migrate:
+                print("WARNING: No quiz data found in MongoDB!")
+                print("Attempting to migrate data from db.json...")
 
-            # Try to migrate data
-            json_path = os.path.join(os.path.dirname(__file__), "..", "db", "db.json")
-            if os.path.exists(json_path):
-                migrator = DataMigrator(db_controller, quiz_controller)
-                if migrator.migrate_from_json_file(json_path):
-                    print("✅ Data migration successful!")
-                    topics = quiz_controller.get_all_topics()
-                    print(f"Available topics: {topics}")
+                # Try to migrate data
+                json_path = os.path.join(os.path.dirname(__file__), "..", "db", "db.json")
+                if os.path.exists(json_path):
+                    migrator = DataMigrator(db_controller, quiz_controller)
+                    if migrator.migrate_from_json_file(json_path):
+                        print("✅ Data migration successful!")
+                        topics = quiz_controller.get_all_topics()
+                        print(f"Available topics: {topics}")
+                    else:
+                        print("ERROR: Data migration failed!")
+                        return False
                 else:
-                    print("ERROR: Data migration failed!")
+                    print(f"ERROR: db.json not found at {json_path}")
                     return False
             else:
-                print(f"ERROR: db.json not found at {json_path}")
+                print("ERROR: No quiz data found in MongoDB!")
+                print("AUTO_MIGRATE_DB is disabled. Database must be initialized using mongodb-init Job.")
+                print("If running in Kubernetes, ensure the mongodb-init Job has completed successfully.")
                 return False
         else:
             print(f"✅ Connected to MongoDB successfully!")

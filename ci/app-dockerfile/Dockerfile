@@ -24,8 +24,10 @@ ENV PATH=/home/appuser/.local/bin:$PATH \
 # Copy installed packages from build stage
 COPY --from=build-stage --chown=appuser:appuser /root/.local /home/appuser/.local
 
-# Copy application code
-COPY --chown=appuser:appuser src/ /app/
+# Copy application code (exclude db.json - initialized via mongodb-init Job)
+COPY --chown=appuser:appuser src/python/ /app/python/
+COPY --chown=appuser:appuser src/db/dbcontroller.py /app/db/
+COPY --chown=appuser:appuser src/requirements.txt /app/
 
 # Switch to non-root user
 USER appuser

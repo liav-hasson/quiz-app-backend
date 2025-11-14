@@ -72,8 +72,10 @@ class Config:  # pylint: disable=too-few-public-methods
         'A: "{answer}"\n\n'
         "Tasks:\n"
         "1. Score 1-10 (10 = excellent).\n"
-        "2. Give constructive feedback on the user's answer quality, "
-        "correct and explain any mistakes and suggest topics to study.\n\n"
+        "2. Give short, constructive feedback on the user's answer quality, and"
+        "briefly correct and explain any mistakes and suggest topics to study.\n"
+        "3. Expect a short, 3-5 sentences answer from the student.\n"
+        "4. Ignore casing and punctuation in evaluation.\n"
         "Format:\n"
         "Your score: <number>/10\n"
         "feedback: <text>\n"
