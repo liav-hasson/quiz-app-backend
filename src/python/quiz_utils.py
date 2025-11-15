@@ -78,6 +78,18 @@ class QuizService:
             logger.warning("no_keywords_available category=%s subject=%s", category, subject)
         return keyword
 
+    def get_random_style_modifier(self, category: str, subject: str) -> Optional[str]:
+        """Return a random style modifier for a given category and subject."""
+        logger.debug("fetching_random_style_modifier category=%s subject=%s", category, subject)
+        quiz_controller = self._ensure_connection()
+        style_modifiers = quiz_controller.get_style_modifiers_by_topic_subtopic(category, subject)
+        style_modifier = random.choice(style_modifiers) if style_modifiers else None
+        if style_modifier:
+            logger.debug("random_style_modifier_selected style_modifier=%s", style_modifier)
+        else:
+            logger.warning("no_style_modifiers_available category=%s subject=%s", category, subject)
+        return style_modifier
+
     def get_random_keywords_from_category(
         self, category: str, count: int = 1
     ) -> List[str]:
@@ -151,6 +163,11 @@ def get_subjects(category: str) -> List[str]:
 def get_random_keyword(category: str, subject: str) -> Optional[str]:
     """Return a random keyword for a given category and subject."""
     return _quiz_service.get_random_keyword(category, subject)
+
+
+def get_random_style_modifier(category: str, subject: str) -> Optional[str]:
+    """Return a random style modifier for a given category and subject."""
+    return _quiz_service.get_random_style_modifier(category, subject)
 
 
 def get_keywords(category: str, subject: str) -> List[str]:

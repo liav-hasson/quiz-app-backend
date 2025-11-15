@@ -6,7 +6,7 @@ import time
 from prometheus_flask_exporter import PrometheusMetrics
 from config import Config
 from validation import validate_difficulty, validate_required_fields
-from quiz_utils import get_categories, get_subjects, get_random_keyword
+from quiz_utils import get_categories, get_subjects, get_random_keyword, get_random_style_modifier
 from ai_utils import generate_question, evaluate_answer
 import sys
 import os
@@ -210,15 +210,19 @@ def api_generate_question():
             )
             return error_response("No keywords found", 404)
 
+        # Get random style modifier for this category/subject
+        style_modifier = get_random_style_modifier(data["category"], data["subject"])
+        
         question = generate_question(
-            data["category"], data["subject"], keyword, difficulty
+            data["category"], data["subject"], keyword, difficulty, style_modifier
         )
         logger.info(
-            "question_generated category=%s subject=%s difficulty=%d keyword=%s",
+            "question_generated category=%s subject=%s difficulty=%d keyword=%s style_modifier=%s",
             data["category"],
             data["subject"],
             difficulty,
             keyword,
+            style_modifier,
         )
 
         return jsonify(

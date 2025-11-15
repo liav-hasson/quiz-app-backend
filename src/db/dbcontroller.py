@@ -294,6 +294,7 @@ class QuizController:
                         "topic": topic,
                         "subtopic": subtopic,
                         "keywords": content.get("keywords", []),
+                        "style_modifiers": content.get("style_modifiers", []),
                         "created_at": datetime.now(),
                         "updated_at": datetime.now(),
                     }
@@ -326,6 +327,12 @@ class QuizController:
         collection = self._get_collection()
         doc = collection.find_one({"topic": topic, "subtopic": subtopic})
         return doc.get("keywords", []) if doc else []
+
+    def get_style_modifiers_by_topic_subtopic(self, topic: str, subtopic: str) -> List[str]:
+        """Get style modifiers for a specific topic and subtopic"""
+        collection = self._get_collection()
+        doc = collection.find_one({"topic": topic, "subtopic": subtopic})
+        return doc.get("style_modifiers", []) if doc else []
 
     def get_all_keywords_by_topic(self, topic: str) -> List[str]:
         """Get all keywords for a topic (across all subtopics)"""
