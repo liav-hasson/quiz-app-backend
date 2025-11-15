@@ -83,12 +83,15 @@ class QuizService:
         logger.debug("fetching_random_style_modifier category=%s subject=%s", category, subject)
         quiz_controller = self._ensure_connection()
         style_modifiers = quiz_controller.get_style_modifiers_by_topic_subtopic(category, subject)
-        style_modifier = random.choice(style_modifiers) if style_modifiers else None
-        if style_modifier:
+        
+        # Check if list has items (empty list [] is truthy but has no items)
+        if style_modifiers and len(style_modifiers) > 0:
+            style_modifier = random.choice(style_modifiers)
             logger.debug("random_style_modifier_selected style_modifier=%s", style_modifier)
+            return style_modifier
         else:
             logger.warning("no_style_modifiers_available category=%s subject=%s", category, subject)
-        return style_modifier
+            return None
 
     def get_random_keywords_from_category(
         self, category: str, count: int = 1
