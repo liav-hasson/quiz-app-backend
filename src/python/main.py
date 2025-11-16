@@ -1,5 +1,4 @@
 """Quiz app REST API."""
-
 from flask import Flask, request, jsonify, g
 import logging
 import time
