@@ -16,7 +16,6 @@ db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "db"))
 sys.path.insert(0, db_path)
 
 from db import DBController, QuizController, DataMigrator, UserController, QuestionsController, TopTenController
-from authlib.integrations.flask_client import OAuth
 import jwt 
 
 from datetime import datetime, timedelta, timezone
@@ -35,7 +34,7 @@ quiz_controller: Optional[QuizController] = None
 user_controller: Optional[UserController] = None
 questions_controller: Optional[QuestionsController] = None
 toptens_controller: Optional[TopTenController] = None
-oauth: OAuth = None  # type: ignore
+oauth = None  # type: ignore
 
 
 def initialize_database():
@@ -59,8 +58,11 @@ def initialize_database():
         questions_controller = QuestionsController(db_controller)
         toptens_controller = TopTenController(db_controller)
 
-        # Initialize OAuth client
+        # Initialize OAuth client (import lazily so tests that don't exercise
+        # OAuth won't fail when `authlib` isn't installed)
         try:
+            from authlib.integrations.flask_client import OAuth
+
             oauth = OAuth()
             oauth.init_app(app)
             oauth.register(
