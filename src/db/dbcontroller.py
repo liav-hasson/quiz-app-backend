@@ -111,6 +111,7 @@ class DBController:
             raise Exception("Not connected to database")
 
 
+
 class UserController:
     def __init__(self, db_controller: DBController):
         self.db_controller = db_controller
@@ -131,7 +132,7 @@ class UserController:
         self,
         username: str,
         hashed_password: str,
-        profile_picture: str = None,
+        profile_picture: str = "",
         experience: int = 0,
     ) -> str:
         """
@@ -252,6 +253,66 @@ class UserController:
         """Check if username exists"""
         collection = self._get_collection()
         return collection.find_one({"username": username}) is not None
+
+    # --- Google OAuth helpers ---
+    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """Get user by email (for OAuth-created users)"""
+        collection = self._get_collection()
+        user = collection.find_one({"email": email})
+        if user:
+            user["_id"] = str(user["_id"])
+        return user
+
+    def get_user_by_google_id(self, google_id: str) -> Optional[Dict[str, Any]]:
+        """Get user by Google `sub` id"""
+        collection = self._get_collection()
+        user = collection.find_one({"google_id": google_id})
+        if user:
+            user["_id"] = str(user["_id"])
+        return user
+
+    def create_or_update_google_user(self, google_id: str, email: str, name: str = None, picture: str = None) -> Dict[str, Any]:
+        """Create or update a user record coming from Google OAuth.
+
+        Returns the user document (with stringified `_id`).
+        """
+        collection = self._get_collection()
+
+        now = datetime.now()
+
+        # Try to find by google_id first, then by email
+        user = collection.find_one({"google_id": google_id})
+        if not user and email:
+            user = collection.find_one({"email": email})
+
+        if user:
+            # Update existing user
+            update_doc = {
+                "email": email,
+                "name": name,
+                "profile_picture": picture,
+                "google_id": google_id,
+                "updated_at": now,
+            }
+            collection.update_one({"_id": user["_id"]}, {"$set": update_doc})
+            user = collection.find_one({"_id": user["_id"]})
+        else:
+            # Create new user
+            user_doc = {
+                "username": email.split("@")[0] if email else None,
+                "email": email,
+                "name": name,
+                "profile_picture": picture,
+                "google_id": google_id,
+                "experience": 0,
+                "created_at": now,
+                "updated_at": now,
+            }
+            result = collection.insert_one(user_doc)
+            user = collection.find_one({"_id": result.inserted_id})
+
+        user["_id"] = str(user["_id"])
+        return user
 
 
 class QuizController:
@@ -477,6 +538,103 @@ class QuizController:
             json_structure[topic][subtopic] = {"keywords": keywords}
 
         return json_structure
+
+
+class QuestionsController:
+    """Controller for storing generated questions and related metadata."""
+
+    def __init__(self, db_controller: DBController):
+        self.db_controller = db_controller
+        self.collection_name = "questions"
+        self.collection = None
+
+    def _get_collection(self):
+        if self.collection is None:
+            if self.db_controller.db is None:
+                raise Exception("Database not connected. Call db_controller.connect() first.")
+            self.collection = self.db_controller.get_collection(self.collection_name)
+        return self.collection
+
+    def add_question(self, user_id: str, username: str, question_text: str, keyword: str, category: str, subject: str, difficulty: int, ai_generated: bool = True, extra: Dict[str, Any] = None) -> str:
+        collection = self._get_collection()
+        doc = {
+            "user_id": user_id,
+            "username": username,
+            "question_text": question_text,
+            "keyword": keyword,
+            "category": category,
+            "subject": subject,
+            "difficulty": difficulty,
+            "ai_generated": ai_generated,
+            "extra": extra or {},
+            "created_at": datetime.now(),
+            "updated_at": datetime.now(),
+        }
+        result = collection.insert_one(doc)
+        return str(result.inserted_id)
+
+    def get_question_by_id(self, question_id: str) -> Optional[Dict[str, Any]]:
+        collection = self._get_collection()
+        try:
+            from bson import ObjectId
+
+            doc = collection.find_one({"_id": ObjectId(question_id)})
+            if doc:
+                doc["_id"] = str(doc["_id"])
+            return doc
+        except Exception:
+            return None
+
+    def get_questions_by_user(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        collection = self._get_collection()
+        docs = list(collection.find({"user_id": user_id}).sort("created_at", -1).limit(limit))
+        for d in docs:
+            d["_id"] = str(d["_id"])
+        return docs
+
+    def get_random_questions(self, count: int = 10, category: str = None) -> List[Dict[str, Any]]:
+        collection = self._get_collection()
+        pipeline = []
+        if category:
+            pipeline.append({"$match": {"category": category}})
+        pipeline.append({"$sample": {"size": count}})
+        results = list(collection.aggregate(pipeline))
+        for r in results:
+            r["_id"] = str(r["_id"])
+        return results
+
+
+class TopTenController:
+    """Controller for managing top-ten leaderboard entries."""
+
+    def __init__(self, db_controller: DBController):
+        self.db_controller = db_controller
+        self.collection_name = "top_ten"
+        self.collection = None
+
+    def _get_collection(self):
+        if self.collection is None:
+            if self.db_controller.db is None:
+                raise Exception("Database not connected. Call db_controller.connect() first.")
+            self.collection = self.db_controller.get_collection(self.collection_name)
+        return self.collection
+
+    def add_or_update_entry(self, username: str, score: int, meta: Dict[str, Any] = None) -> bool:
+        collection = self._get_collection()
+        now = datetime.now()
+        result = collection.update_one(
+            {"username": username},
+            {"$set": {"score": score, "meta": meta or {}, "updated_at": now}, "$setOnInsert": {"created_at": now}},
+            upsert=True,
+        )
+        return True
+
+    def get_top_ten(self) -> List[Dict[str, Any]]:
+        collection = self._get_collection()
+        docs = list(collection.find({}).sort("score", -1).limit(10))
+        for d in docs:
+            d["_id"] = str(d["_id"])
+        return docs
 
 
 class DataMigrator:
