@@ -42,7 +42,8 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages --upgrade --ig
         pymongo==4.10.1 \
         openai==1.59.5 \
         boto3==1.35.93 \
-        prometheus-flask-exporter==0.23.0
+        prometheus-flask-exporter==0.23.0 \
+        authlib==1.2.0
 
 # -----------------------------
 # 2.5. Security tools for DevSecOps exercises
