@@ -28,30 +28,26 @@ RUN apt-get update && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
-# 2. Python packages (safe upgrade)
+# 2. Python packages installation
 # -----------------------------
-RUN python3 -m pip install --no-cache-dir --break-system-packages --upgrade --ignore-installed pip==24.3.1 setuptools==80.9.0 wheel==0.45.1 && \
-    pip3 install --no-cache-dir --break-system-packages \
-        pytest==8.4.2 \
-        pytest-cov==6.0.0 \
-        pylint==3.3.6 \
-        flask==3.1.1 \
-        flask-scss==0.5 \
-        flask-cors==5.0.0 \
-        requests==2.32.4 \
-        pymongo==4.10.1 \
-        openai==1.59.5 \
-        boto3==1.35.93 \
-        prometheus-flask-exporter==0.23.0 \
-        authlib==1.2.0
+# Upgrade pip, setuptools, wheel first
+RUN python3 -m pip install --no-cache-dir --break-system-packages --upgrade --ignore-installed \
+        pip==24.3.1 \
+        setuptools==80.9.0 \
+        wheel==0.45.1
 
-# -----------------------------
-# 2.5. Security tools for DevSecOps exercises
-# -----------------------------
+# Copy and install CI/testing tools from agent_requirements.txt
+COPY ci/jenkins-agent/agent_requirements.txt /tmp/agent_requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages \
-        safety==2.3.5 \
-        bandit==1.8.6 \
-        --ignore-installed packaging
+        -r /tmp/agent_requirements.txt \
+        --ignore-installed packaging && \
+    rm /tmp/agent_requirements.txt
+
+# Copy and install application dependencies from src/requirements.txt
+COPY src/requirements.txt /tmp/requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages \
+        -r /tmp/requirements.txt && \
+    rm /tmp/requirements.txt
 
 # Install Cosign and Hadolint binaries
 RUN curl -O -L "https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64" && \
