@@ -70,6 +70,10 @@ pipeline {
 
         // CI resources directory
         CI_DIR                = "ci"
+        
+        // Environment detection (prod vs dev)
+        // Will be set dynamically in Prepare stage based on branch
+        DEPLOY_ENV            = ""
     }
 
     stages {
@@ -79,14 +83,35 @@ pipeline {
                     echo '--------- Preparing image version ---------'
                     checkout scm
 
+                    // Determine deployment environment based on branch
+                    if (env.BRANCH_NAME == 'main') {
+                        env.DEPLOY_ENV = 'prod'
+                        echo "Branch: ${env.BRANCH_NAME} → Deploying to PRODUCTION"
+                    } else {
+                        env.DEPLOY_ENV = 'dev'
+                        echo "Branch: ${env.BRANCH_NAME} → Deploying to DEVELOPMENT"
+                    }
+
                     def semver = sh(returnStdout: true, script: './scripts/compute_next_version.sh . auto').trim()
                     if (semver) {
                         echo "Computed semantic version: ${semver}"
-                        env.IMAGE_TAG = semver
+                        // Append -dev suffix for non-main branches
+                        if (env.DEPLOY_ENV == 'dev') {
+                            env.IMAGE_TAG = "${semver}-dev"
+                            echo "Dev environment: appending -dev suffix → ${env.IMAGE_TAG}"
+                        } else {
+                            env.IMAGE_TAG = semver
+                        }
                     } else {
                         echo "No semantic version computed; falling back to date-based tag: ${env.BUILD_TAG}"
                         env.IMAGE_TAG = env.BUILD_TAG
+                        if (env.DEPLOY_ENV == 'dev') {
+                            env.IMAGE_TAG = "${env.IMAGE_TAG}-dev"
+                        }
                     }
+                    
+                    echo "Final image tag: ${env.IMAGE_TAG}"
+                    echo "Deploy environment: ${env.DEPLOY_ENV}"
                 }
             }
             post {
@@ -279,7 +304,8 @@ pipeline {
                                 "${GIT_USER_NAME}" \
                                 "${GIT_USER_EMAIL}" \
                                 "${GIT_USERNAME}" \
-                                "${GIT_PASSWORD}"
+                                "${GIT_PASSWORD}" \
+                                "${DEPLOY_ENV}"
                         '''
                     }
                 }
@@ -287,6 +313,7 @@ pipeline {
             post {
                 success {
                     echo "✅ GitOps repository updated successfully"
+                    echo "Environment: ${env.DEPLOY_ENV}"
                     echo "ArgoCD will detect changes and deploy automatically"
                 }
                 failure {
@@ -310,6 +337,8 @@ pipeline {
                 def finalMessage = [
                     "${statusIcon} GitOps Pipeline *${env.JOB_NAME}* #${env.BUILD_NUMBER} ${env.PIPELINE_STATUS}",
                     "",
+                    "*Environment:* ${env.DEPLOY_ENV?.toUpperCase() ?: 'UNKNOWN'}",
+                    "*Branch:* ${env.BRANCH_NAME}",
                     "*Docker Image:* ${env.DOCKERHUB_CREDENTIALS_USR}/${env.DOCKER_IMAGE_NAME}:${env.IMAGE_TAG}",
                     "${slackMessage}"
                 ].join('\n')

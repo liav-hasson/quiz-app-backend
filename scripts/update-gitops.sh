@@ -15,10 +15,11 @@ GIT_USER_NAME="$6"
 GIT_USER_EMAIL="$7"
 GITHUB_USERNAME="$8"
 GITHUB_PASSWORD="$9"
+DEPLOY_ENV="${10:-prod}"  # Default to prod if not specified
 
 # Validation
 if [ -z "$DOCKER_USERNAME" ] || [ -z "$DOCKER_IMAGE_NAME" ] || [ -z "$IMAGE_TAG" ] || [ -z "$GITOPS_REPO_URL" ] || [ -z "$GIT_USER_NAME" ] || [ -z "$GIT_USER_EMAIL" ]; then
-    echo "Usage: $0 <docker_username> <docker_image_name> <image_tag> <build_number> <gitops_repo_url> <git_user_name> <git_user_email> [github_username] [github_password]"
+    echo "Usage: $0 <docker_username> <docker_image_name> <image_tag> <build_number> <gitops_repo_url> <git_user_name> <git_user_email> [github_username] [github_password] [deploy_env]"
     echo "ERROR: Missing required parameters:"
     echo "   DOCKER_USERNAME: '$DOCKER_USERNAME'"
     echo "   DOCKER_IMAGE_NAME: '$DOCKER_IMAGE_NAME'"
@@ -30,7 +31,17 @@ if [ -z "$DOCKER_USERNAME" ] || [ -z "$DOCKER_IMAGE_NAME" ] || [ -z "$IMAGE_TAG"
     exit 1
 fi
 
-echo "Updating GitOps configuration..."
+# Determine values file based on environment
+if [ "$DEPLOY_ENV" = "dev" ]; then
+    VALUES_FILE="values-dev.yaml"
+    echo "Updating GitOps configuration for DEV environment..."
+else
+    VALUES_FILE="values.yaml"
+    echo "Updating GitOps configuration for PRODUCTION environment..."
+fi
+
+echo "Environment: ${DEPLOY_ENV}"
+echo "Values file: ${VALUES_FILE}"
 echo "Image: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
 
 # Create temp workspace
@@ -61,27 +72,32 @@ git config user.email "$GIT_USER_EMAIL"
 echo "--------- Updating Helm chart ---------"
 cd quiz-backend
 
-# Update image repository and tag in values.yaml
-sed -i "s|repository: .*|repository: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}|g" values.yaml
-sed -i "s|tag: \".*\"|tag: \"${IMAGE_TAG}\"|g" values.yaml
+# Update image repository and tag in the appropriate values file
+sed -i "s|repository: .*|repository: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}|g" "$VALUES_FILE"
+sed -i "s|tag: \".*\"|tag: \"${IMAGE_TAG}\"|g" "$VALUES_FILE"
 
-# Update appVersion in Chart.yaml
-sed -i "s|appVersion: \".*\"|appVersion: \"${IMAGE_TAG}\"|g" Chart.yaml
+# Update appVersion in Chart.yaml (only for production)
+if [ "$DEPLOY_ENV" = "prod" ]; then
+    sed -i "s|appVersion: \".*\"|appVersion: \"${IMAGE_TAG}\"|g" Chart.yaml
+    FILES_TO_COMMIT="${VALUES_FILE} Chart.yaml"
+else
+    FILES_TO_COMMIT="${VALUES_FILE}"
+fi
 
 # Show the changes
 echo "Changes made:"
-git diff values.yaml Chart.yaml
+git diff $FILES_TO_COMMIT
 
 
 # Commit and push
 echo "--------- Committing changes ---------"
-git add values.yaml Chart.yaml
-git commit -m "Deploy ${DOCKER_IMAGE_NAME}:${IMAGE_TAG}
+git add $FILES_TO_COMMIT
+git commit -m "Deploy ${DOCKER_IMAGE_NAME}:${IMAGE_TAG} [${DEPLOY_ENV}]
 
+- Environment: ${DEPLOY_ENV}
 - Updated from Jenkins build #${BUILD_NUMBER:-unknown}
 - Image: ${DOCKER_USERNAME}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}
-- Updated values.yaml image tag
-- Updated Chart.yaml appVersion" || {
+- Updated ${VALUES_FILE} image tag" || {
     echo "No changes to commit (image tag might already be up to date)"
     rm -rf "$TEMP_DIR"
     exit 0
@@ -100,15 +116,19 @@ fi
 
 git push origin main
 
-# Tag the release version for next build's version calculation
-echo "--------- Tagging release version ---------"
-git tag -a "${IMAGE_TAG}" -m "Release ${DOCKER_IMAGE_NAME} ${IMAGE_TAG} - Build #${BUILD_NUMBER:-unknown}" 2>/dev/null || {
-    echo "Tag ${IMAGE_TAG} already exists, skipping tag creation"
-}
-git push origin "${IMAGE_TAG}" 2>/dev/null || {
-    echo "Tag ${IMAGE_TAG} already exists on remote, skipping tag push"
-}
-echo "Tagged release: ${IMAGE_TAG}"
+# Tag the release version only for production builds
+if [ "$DEPLOY_ENV" = "prod" ]; then
+    echo "--------- Tagging release version ---------"
+    git tag -a "${IMAGE_TAG}" -m "Release ${DOCKER_IMAGE_NAME} ${IMAGE_TAG} - Build #${BUILD_NUMBER:-unknown}" 2>/dev/null || {
+        echo "Tag ${IMAGE_TAG} already exists, skipping tag creation"
+    }
+    git push origin "${IMAGE_TAG}" 2>/dev/null || {
+        echo "Tag ${IMAGE_TAG} already exists on remote, skipping tag push"
+    }
+    echo "Tagged release: ${IMAGE_TAG}"
+else
+    echo "Dev build - skipping git tag creation"
+fi
 
 # Cleanup
 rm -rf "$TEMP_DIR"
