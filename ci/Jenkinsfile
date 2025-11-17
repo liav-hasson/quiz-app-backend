@@ -83,39 +83,18 @@ pipeline {
                     echo '--------- Preparing image version ---------'
                     checkout scm
 
-                    // Determine deployment environment based on branch
-                    def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ''
-                    echo "Detected branch: ${branchName}"
-                    
-                    // Only deploy to prod if on main branch (handle origin/main and main)
-                    if (branchName == 'main' || branchName == 'origin/main') {
-                        env.DEPLOY_ENV = 'prod'
-                        echo "Branch: ${branchName} → Deploying to PRODUCTION"
-                    } else {
-                        env.DEPLOY_ENV = 'dev'
-                        echo "Branch: ${branchName ?: 'unknown'} → Deploying to DEVELOPMENT"
-                    }
+                    env.DEPLOY_ENV = 'prod'
 
                     def semver = sh(returnStdout: true, script: './scripts/compute_next_version.sh . auto').trim()
                     if (semver) {
                         echo "Computed semantic version: ${semver}"
-                        // Append -dev suffix for non-main branches
-                        if (env.DEPLOY_ENV == 'dev') {
-                            env.IMAGE_TAG = "${semver}-dev"
-                            echo "Dev environment: appending -dev suffix → ${env.IMAGE_TAG}"
-                        } else {
-                            env.IMAGE_TAG = semver
-                        }
+                        env.IMAGE_TAG = semver
                     } else {
                         echo "No semantic version computed; falling back to date-based tag: ${env.BUILD_TAG}"
                         env.IMAGE_TAG = env.BUILD_TAG
-                        if (env.DEPLOY_ENV == 'dev') {
-                            env.IMAGE_TAG = "${env.IMAGE_TAG}-dev"
-                        }
                     }
                     
                     echo "Final image tag: ${env.IMAGE_TAG}"
-                    echo "Deploy environment: ${env.DEPLOY_ENV}"
                 }
             }
             post {
@@ -332,6 +311,9 @@ pipeline {
         stage('Tag Application Release') {
             when {
                 expression { env.DEPLOY_ENV == 'prod' }
+        stage('Tag Application Release') {
+            when {
+                expression { env.DEPLOY_ENV == 'prod' }
             }
             steps {
                 echo '--------- Tagging Application Release ---------'
@@ -362,10 +344,7 @@ pipeline {
                         '''
                     }
                 }
-            }
-            post {
-                success {
-                    echo "✅ Application tagged with version ${env.IMAGE_TAG}"
+            }       echo "✅ Application tagged with version ${env.IMAGE_TAG}"
                 }
                 failure {
                     script {
