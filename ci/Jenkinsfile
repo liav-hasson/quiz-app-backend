@@ -311,9 +311,6 @@ pipeline {
         stage('Tag Application Release') {
             when {
                 expression { env.DEPLOY_ENV == 'prod' }
-        stage('Tag Application Release') {
-            when {
-                expression { env.DEPLOY_ENV == 'prod' }
             }
             steps {
                 echo '--------- Tagging Application Release ---------'
@@ -344,7 +341,10 @@ pipeline {
                         '''
                     }
                 }
-            }       echo "✅ Application tagged with version ${env.IMAGE_TAG}"
+            }
+            post {
+                success {
+                    echo "✅ Application tagged with version ${env.IMAGE_TAG}"
                 }
                 failure {
                     script {
