@@ -1,11 +1,21 @@
-"""Quiz app REST API - Main application entry point."""
+"""Quiz app REST API - Main application entry point.
 
-from flask import Flask, g, request
+This module provides the Flask application factory and initialization logic
+for the Quiz App backend API. It handles:
+- Database connection and controller initialization
+- OAuth configuration for Google authentication
+- Route registration and middleware setup
+- Prometheus metrics configuration
+"""
+
 import logging
-import time
-import sys
 import os
+import sys
+import time
 from typing import Optional
+
+from authlib.integrations.flask_client import OAuth
+from flask import Flask, g, request
 from prometheus_flask_exporter import PrometheusMetrics
 
 # Configuration
@@ -34,17 +44,22 @@ logger = logging.getLogger(__name__)
 # Create Flask app
 app = Flask(__name__)
 
-# Database controllers (initialized later)
+# Database controllers (initialized by initialize_database())
 db_controller: Optional[DBController] = None
 user_controller: Optional[UserController] = None
 questions_controller: Optional[QuestionsController] = None
 toptens_controller: Optional[TopTenController] = None
 quiz_controller: Optional[QuizController] = None
-oauth = None  # type: ignore
+oauth = None  # type: ignore  # OAuth instance set by initialize_database()
 
 
-def initialize_database():
-    """Initialize database connection and verify data exists."""
+def initialize_database() -> bool:
+    """Initialize database connection and verify data exists.
+
+    Returns:
+        bool: True if initialization successful, False otherwise.
+    """
+    # pylint: disable=global-statement
     global db_controller, quiz_controller
     global user_controller, questions_controller, toptens_controller, oauth
 
@@ -64,21 +79,21 @@ def initialize_database():
 
         # Initialize OAuth
         try:
-            from authlib.integrations.flask_client import OAuth
-
             oauth = OAuth()
             oauth.init_app(app)
             oauth.register(
                 name="google",
                 client_id=os.getenv("GOOGLE_CLIENT_ID"),
                 client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-                server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+                server_metadata_url=(
+                    "https://accounts.google.com/.well-known/openid-configuration"
+                ),
                 client_kwargs={"scope": "openid email profile"},
             )
             logger.info("OAuth initialized successfully")
-        except Exception as e:
-            logger.error("OAuth initialization failed: %s", str(e), exc_info=True)
-            raise RuntimeError(f"Failed to initialize OAuth: {e}")
+        except Exception as exc:
+            logger.error("OAuth initialization failed: %s", str(exc), exc_info=True)
+            raise RuntimeError(f"Failed to initialize OAuth: {exc}") from exc
 
         # Check if quiz data exists
         topics = quiz_controller.get_all_topics()
@@ -108,12 +123,12 @@ def initialize_database():
         logger.info("Database initialized successfully. Available topics: %s", topics)
         return True
 
-    except Exception as e:
-        logger.error("Database initialization failed: %s", str(e), exc_info=True)
+    except (ConnectionError, RuntimeError, OSError) as exc:
+        logger.error("Database initialization failed: %s", str(exc), exc_info=True)
         return False
 
 
-def initialize_routes():
+def initialize_routes() -> None:
     """Initialize and register all route blueprints."""
     # Initialize route dependencies
     init_health_routes(db_controller)
@@ -129,11 +144,11 @@ def initialize_routes():
     logger.info("All routes registered successfully")
 
 
-def setup_middleware():
+def setup_middleware() -> None:
     """Setup Flask middleware and request hooks."""
 
     @app.before_request
-    def before_request():
+    def before_request() -> None:
         """Log request start and track timing."""
         g.start_time = time.time()
         logger.info(
@@ -145,7 +160,14 @@ def setup_middleware():
 
     @app.after_request
     def after_request(response):
-        """Log request completion with duration."""
+        """Log request completion with duration.
+
+        Args:
+            response: Flask response object.
+
+        Returns:
+            Flask response object.
+        """
         if hasattr(g, "start_time"):
             duration = time.time() - g.start_time
             logger.info(
@@ -158,15 +180,19 @@ def setup_middleware():
         return response
 
 
-def setup_metrics():
+def setup_metrics() -> None:
     """Setup Prometheus metrics."""
     metrics = PrometheusMetrics(app)
     metrics.info("quiz_app_info", "Quiz Application Info", version="1.0.0")
     logger.info("Prometheus metrics initialized")
 
 
-def create_app():
-    """Application factory pattern."""
+def create_app() -> Flask:
+    """Application factory pattern.
+
+    Returns:
+        Flask: Configured Flask application instance.
+    """
     # Initialize database
     if not initialize_database():
         logger.critical("Cannot start app without database connection")
