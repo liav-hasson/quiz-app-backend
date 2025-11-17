@@ -3,9 +3,10 @@ import sys
 import os
 from unittest.mock import MagicMock
 
-# Add python and db directories to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'db'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
+# Set PYTHONPATH to src directory for clean imports
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
 # Define test data
 VALID_TOPICS = ['Containers', 'CI/CD', 'Kubernetes']

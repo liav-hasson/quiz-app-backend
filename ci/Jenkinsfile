@@ -70,6 +70,10 @@ pipeline {
 
         // CI resources directory
         CI_DIR                = "ci"
+        
+        // Environment detection (prod vs dev)
+        // Will be set dynamically in Prepare stage based on branch
+        DEPLOY_ENV            = ""
     }
 
     stages {
@@ -79,14 +83,39 @@ pipeline {
                     echo '--------- Preparing image version ---------'
                     checkout scm
 
+                    // Determine deployment environment based on branch
+                    def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ''
+                    echo "Detected branch: ${branchName}"
+                    
+                    // Only deploy to prod if on main branch (handle origin/main and main)
+                    if (branchName == 'main' || branchName == 'origin/main') {
+                        env.DEPLOY_ENV = 'prod'
+                        echo "Branch: ${branchName} → Deploying to PRODUCTION"
+                    } else {
+                        env.DEPLOY_ENV = 'dev'
+                        echo "Branch: ${branchName ?: 'unknown'} → Deploying to DEVELOPMENT"
+                    }
+
                     def semver = sh(returnStdout: true, script: './scripts/compute_next_version.sh . auto').trim()
                     if (semver) {
                         echo "Computed semantic version: ${semver}"
-                        env.IMAGE_TAG = semver
+                        // Append -dev suffix for non-main branches
+                        if (env.DEPLOY_ENV == 'dev') {
+                            env.IMAGE_TAG = "${semver}-dev"
+                            echo "Dev environment: appending -dev suffix → ${env.IMAGE_TAG}"
+                        } else {
+                            env.IMAGE_TAG = semver
+                        }
                     } else {
                         echo "No semantic version computed; falling back to date-based tag: ${env.BUILD_TAG}"
                         env.IMAGE_TAG = env.BUILD_TAG
+                        if (env.DEPLOY_ENV == 'dev') {
+                            env.IMAGE_TAG = "${env.IMAGE_TAG}-dev"
+                        }
                     }
+                    
+                    echo "Final image tag: ${env.IMAGE_TAG}"
+                    echo "Deploy environment: ${env.DEPLOY_ENV}"
                 }
             }
             post {
@@ -279,7 +308,8 @@ pipeline {
                                 "${GIT_USER_NAME}" \
                                 "${GIT_USER_EMAIL}" \
                                 "${GIT_USERNAME}" \
-                                "${GIT_PASSWORD}"
+                                "${GIT_PASSWORD}" \
+                                "${DEPLOY_ENV}"
                         '''
                     }
                 }
@@ -287,6 +317,7 @@ pipeline {
             post {
                 success {
                     echo "✅ GitOps repository updated successfully"
+                    echo "Environment: ${env.DEPLOY_ENV}"
                     echo "ArgoCD will detect changes and deploy automatically"
                 }
                 failure {
@@ -294,6 +325,53 @@ pipeline {
                         env.PIPELINE_STATUS = "FAILURE"
                     }
                     echo "❌ Failed to update GitOps repository"
+                }
+            }
+        }
+
+        stage('Tag Application Release') {
+            when {
+                expression { env.DEPLOY_ENV == 'prod' }
+            }
+            steps {
+                echo '--------- Tagging Application Release ---------'
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'github-credentials',
+                                                      usernameVariable: 'GIT_USERNAME',
+                                                      passwordVariable: 'GIT_PASSWORD')]) {
+                        sh '''
+                            # Configure git
+                            git config user.name "${GIT_USER_NAME}"
+                            git config user.email "${GIT_USER_EMAIL}"
+                            
+                            # Create annotated tag
+                            git tag -a "${IMAGE_TAG}" -m "Release ${IMAGE_TAG} - Build #${BUILD_NUMBER}" || {
+                                echo "Tag ${IMAGE_TAG} already exists locally"
+                            }
+                            
+                            # Build authenticated URL
+                            REPO_PATH=$(echo "${GITHUB_REPO_URL}" | sed 's|https://||')
+                            AUTHENTICATED_URL="https://${GIT_USERNAME}:${GIT_PASSWORD}@${REPO_PATH}"
+                            
+                            # Push tag to remote
+                            git push "${AUTHENTICATED_URL}" "${IMAGE_TAG}" || {
+                                echo "Tag ${IMAGE_TAG} already exists on remote"
+                            }
+                            
+                            echo "Tagged application repo with ${IMAGE_TAG}"
+                        '''
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "✅ Application tagged with version ${env.IMAGE_TAG}"
+                }
+                failure {
+                    script {
+                        env.PIPELINE_STATUS = "FAILURE"
+                    }
+                    echo "❌ Failed to tag application release"
                 }
             }
         }
@@ -310,6 +388,8 @@ pipeline {
                 def finalMessage = [
                     "${statusIcon} GitOps Pipeline *${env.JOB_NAME}* #${env.BUILD_NUMBER} ${env.PIPELINE_STATUS}",
                     "",
+                    "*Environment:* ${env.DEPLOY_ENV?.toUpperCase() ?: 'UNKNOWN'}",
+                    "*Branch:* ${env.BRANCH_NAME}",
                     "*Docker Image:* ${env.DOCKERHUB_CREDENTIALS_USR}/${env.DOCKER_IMAGE_NAME}:${env.IMAGE_TAG}",
                     "${slackMessage}"
                 ].join('\n')

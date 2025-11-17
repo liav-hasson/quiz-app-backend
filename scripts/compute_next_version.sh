@@ -92,8 +92,17 @@ case "$MODE" in
       # Collect commit subjects since the last tag
       if [ "$LATEST_TAG" = "v0.0.0" ]; then
         COMMITS=$(git log --pretty=%s --no-merges 2>/dev/null || true)
+        echo "[compute_next_version] No previous tag; collecting all commits" >&2
       else
-        COMMITS=$(git log --pretty=%s --no-merges "$LATEST_TAG"..HEAD 2>/dev/null || true)
+        # Check if the tag exists locally before using it
+        if git rev-parse "$LATEST_TAG" >/dev/null 2>&1; then
+          COMMITS=$(git log --pretty=%s --no-merges "$LATEST_TAG"..HEAD 2>/dev/null || true)
+          echo "[compute_next_version] Using local tag $LATEST_TAG as baseline" >&2
+        else
+          # Tag from Docker Hub doesn't exist locally - get all commits
+          COMMITS=$(git log --pretty=%s --no-merges 2>/dev/null || true)
+          echo "[compute_next_version] Tag $LATEST_TAG from Docker Hub not found locally; using all commits" >&2
+        fi
       fi
       echo "[compute_next_version] Collected commit messages (count=$(echo "$COMMITS" | wc -l))" >&2
     fi
