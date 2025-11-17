@@ -24,7 +24,7 @@ def login():
 
     result, status_code = auth_controller.handle_login(request.url_root)
     if status_code == 200:
-        return result  # Redirect response
+        return result
     return jsonify(result), status_code
 
 
