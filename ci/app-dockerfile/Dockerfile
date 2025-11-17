@@ -40,5 +40,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # Set PYTHONPATH to app root so all modules can be imported
 ENV PYTHONPATH=/app:${PYTHONPATH}
 
-# Run server using gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "60", "server:app"]
+# Run server using gunicorn (app:app refers to server/app.py and the app object)
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "60", "app:app"]
