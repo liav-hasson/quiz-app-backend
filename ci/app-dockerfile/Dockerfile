@@ -4,10 +4,7 @@ FROM python:3.11-slim AS build-stage
 WORKDIR /build
 
 # Copy requirements and install dependencies system-wide in build-stage
-# Installing system-wide (into /usr/local) avoids using per-user
-# .local layout and makes it straightforward to copy system python
-# packages and executables into the final image.
-COPY src/requirements.txt .
+COPY server/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # --- Final Stage ---
@@ -25,13 +22,10 @@ ENV PATH=/usr/local/bin:/home/appuser/.local/bin:$PATH \
     FLASK_PORT=5000
 
 # Copy installed packages from build stage (system-wide)
-# When installing system-wide in build-stage, packages are placed under
-# /usr/local (bin, lib, etc.). Copy that directory into the final image
-# so the installed packages and executables (gunicorn, etc.) are available.
 COPY --from=build-stage /usr/local /usr/local
 
-# Copy application code (exclude db.json - initialized via mongodb-init Job)
-COPY --chown=appuser:appuser src/ /app/
+# Copy server code
+COPY --chown=appuser:appuser server/ /app/
 
 # Switch to non-root user
 USER appuser
@@ -43,9 +37,8 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health').read()"
 
-# Set PYTHONPATH to include both db and python directories
-ENV PYTHONPATH=/app/db:/app/python:$PYTHONPATH
+# Set PYTHONPATH to app root so all modules can be imported
+ENV PYTHONPATH=/app:${PYTHONPATH}
 
-# Stay in /app so both db/ and python/ modules can be imported
-# Use python.main:app to specify the module path for gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "60", "python.main:app"]
+# Run server using gunicorn (app:app refers to server/app.py and the app object)
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "60", "app:app"]

@@ -64,7 +64,9 @@ class QuizController:
         doc = collection.find_one({"topic": topic, "subtopic": subtopic})
         return doc.get("keywords", []) if doc else []
 
-    def get_style_modifiers_by_topic_subtopic(self, topic: str, subtopic: str) -> List[str]:
+    def get_style_modifiers_by_topic_subtopic(
+        self, topic: str, subtopic: str
+    ) -> List[str]:
         collection = self._get_collection()
         doc = collection.find_one({"topic": topic, "subtopic": subtopic})
         return doc.get("style_modifiers", []) if doc else []

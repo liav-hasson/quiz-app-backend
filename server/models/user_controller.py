@@ -93,7 +93,10 @@ class UserController:
         collection = self._get_collection()
         result = collection.update_one(
             {"username": username},
-            {"$inc": {"experience": points, "questions_count": 1}, "$set": {"updated_at": datetime.now()}},
+            {
+                "$inc": {"experience": points, "questions_count": 1},
+                "$set": {"updated_at": datetime.now()},
+            },
         )
         return result.modified_count > 0
 
@@ -133,7 +136,13 @@ class UserController:
             user["_id"] = str(user["_id"])
         return user
 
-    def create_or_update_google_user(self, google_id: str, email: str, name: Optional[str] = None, picture: Optional[str] = None) -> Dict[str, Any]:
+    def create_or_update_google_user(
+        self,
+        google_id: str,
+        email: str,
+        name: Optional[str] = None,
+        picture: Optional[str] = None,
+    ) -> Dict[str, Any]:
         collection = self._get_collection()
 
         now = datetime.now()
