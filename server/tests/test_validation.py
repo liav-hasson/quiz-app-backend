@@ -1,6 +1,6 @@
 """Tests for validation module."""
 import pytest
-from validation import validate_difficulty, validate_required_fields
+from utils.validation import validate_difficulty, validate_required_fields
 
 
 def test_validate_difficulty():

@@ -1,10 +1,7 @@
 """Tests for Flask API endpoints."""
-import sys
-sys.path.insert(0, '../python')
-
 import pytest
 from unittest.mock import patch
-from main import app
+from app import app
 
 
 @pytest.fixture
@@ -42,7 +39,7 @@ def test_subjects_missing_category(client):
     assert response.status_code == 400
 
 
-@patch('main.generate_question')
+@patch('app.generate_question')
 def test_generate_question(mock_gen, client):
     """Generate question should return question data."""
     mock_gen.return_value = "What is Docker?"
@@ -55,7 +52,7 @@ def test_generate_question(mock_gen, client):
     assert 'question' in response.get_json()
 
 
-@patch('main.evaluate_answer')
+@patch('app.evaluate_answer')
 def test_evaluate_answer(mock_eval, client):
     """Evaluate answer should return feedback."""
     mock_eval.return_value = "Score: 8/10"

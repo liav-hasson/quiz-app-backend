@@ -1,8 +1,5 @@
 """Tests for quiz_utils module."""
-import sys
-sys.path.insert(0, '../python')
-
-from quiz_utils import get_categories, get_subjects, get_random_keyword
+from utils.quiz_utils import get_categories, get_subjects, get_random_keyword
 
 
 def test_get_categories():
