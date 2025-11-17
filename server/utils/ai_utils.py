@@ -7,7 +7,7 @@ import boto3
 from openai import OpenAI
 
 # Importing config class in config.py
-from config import Config
+from utils.config import Config
 
 logger = logging.getLogger(__name__)
 

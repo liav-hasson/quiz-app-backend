@@ -15,16 +15,22 @@ def _get_mongodb_credentials_from_ssm():
     Returns (username, password) tuple or (None, None) if not available.
     """
     # Skip SSM in tests
-    if os.environ.get('PYTEST_CURRENT_TEST'):
+    if os.environ.get("PYTEST_CURRENT_TEST"):
         return None, None
-    
+
     if not boto3:
         return None, None
-    
+
     try:
-        ssm = boto3.client('ssm', region_name=os.environ.get('AWS_REGION', 'eu-north-1'))
-        username = ssm.get_parameter(Name='/quiz-app/mongodb/root-username', WithDecryption=False)['Parameter']['Value']
-        password = ssm.get_parameter(Name='/quiz-app/mongodb/root-password', WithDecryption=True)['Parameter']['Value']
+        ssm = boto3.client(
+            "ssm", region_name=os.environ.get("AWS_REGION", "eu-north-1")
+        )
+        username = ssm.get_parameter(
+            Name="/quiz-app/mongodb/root-username", WithDecryption=False
+        )["Parameter"]["Value"]
+        password = ssm.get_parameter(
+            Name="/quiz-app/mongodb/root-password", WithDecryption=True
+        )["Parameter"]["Value"]
         return username, password
     except Exception as e:
         print(f"Could not fetch MongoDB credentials from SSM: {e}")
@@ -32,41 +38,45 @@ def _get_mongodb_credentials_from_ssm():
 
 
 class DBController:
-    def __init__(self, host=None, port=None, db_name="quizdb", username=None, password=None):
+    def __init__(
+        self, host=None, port=None, db_name="quizdb", username=None, password=None
+    ):
         """
         Initialize MongoDB connection
-        
+
         Args:
             host: MongoDB hostname (default: from env MONGODB_HOST or Kubernetes service DNS)
             port: MongoDB port (default: from env MONGODB_PORT or 27017)
             db_name: Database name (default: quizdb)
             username: MongoDB username (default: from env MONGODB_USERNAME or SSM Parameter Store)
             password: MongoDB password (default: from env MONGODB_PASSWORD or SSM Parameter Store)
-        
+
         Note: In Kubernetes, use mongodb.mongodb.svc.cluster.local
               For docker-compose, use 'mongodb' (service name)
               For local development, use 'localhost'
-              
+
         Credential priority:
         1. Explicitly passed username/password
         2. Environment variables (MONGODB_USERNAME, MONGODB_PASSWORD)
         3. AWS SSM Parameter Store (/quiz-app/mongodb/root-username, /quiz-app/mongodb/root-password)
         4. No authentication (fallback)
         """
-        self.host = host or os.environ.get("MONGODB_HOST", "mongodb.mongodb.svc.cluster.local")
+        self.host = host or os.environ.get(
+            "MONGODB_HOST", "mongodb.mongodb.svc.cluster.local"
+        )
         self.port = port or int(os.environ.get("MONGODB_PORT", "27017"))
         self.db_name = db_name
-        
+
         # Try to get credentials in priority order
         self.username = username or os.environ.get("MONGODB_USERNAME")
         self.password = password or os.environ.get("MONGODB_PASSWORD")
-        
+
         # If env vars not set, try fetching from SSM Parameter Store
         if not self.username or not self.password:
             ssm_username, ssm_password = _get_mongodb_credentials_from_ssm()
             self.username = self.username or ssm_username
             self.password = self.password or ssm_password
-        
+
         self.client = None
         self.db = None
 
@@ -77,17 +87,19 @@ class DBController:
             if self.username and self.password:
                 # Authenticated connection - use 'admin' as authSource for root user
                 connection_string = f"mongodb://{self.username}:{self.password}@{self.host}:{self.port}/{self.db_name}?authSource=admin"
-                print(f"Connecting to MongoDB at {self.host}:{self.port} as user '{self.username}' (authSource=admin)")
+                print(
+                    f"Connecting to MongoDB at {self.host}:{self.port} as user '{self.username}' (authSource=admin)"
+                )
             else:
                 # Unauthenticated connection (for local development/testing)
                 connection_string = f"mongodb://{self.host}:{self.port}/"
                 print(f"Connecting to MongoDB at {self.host}:{self.port} (no auth)")
-            
+
             self.client = pymongo.MongoClient(connection_string)
             self.db = self.client[self.db_name]
             # Test the connection
             self.client.admin.command("ping")
-            print(f"Connected to MongoDB successfully")
+            print("Connected to MongoDB successfully")
             return True
         except Exception as e:
             print(f"Failed to connect to MongoDB: {e}")
@@ -109,7 +121,6 @@ class DBController:
             return self.db[collection_name]
         else:
             raise Exception("Not connected to database")
-
 
 
 class UserController:
@@ -232,7 +243,7 @@ class UserController:
         return result.modified_count > 0
 
     def get_users_by_experience_range(
-        self, min_exp: int = 0, max_exp: int = None
+        self, min_exp: int = 0, max_exp: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """Get users within experience range"""
         collection = self._get_collection()
@@ -271,7 +282,13 @@ class UserController:
             user["_id"] = str(user["_id"])
         return user
 
-    def create_or_update_google_user(self, google_id: str, email: str, name: str = None, picture: str = None) -> Dict[str, Any]:
+    def create_or_update_google_user(
+        self,
+        google_id: str,
+        email: str,
+        name: Optional[str] = None,
+        picture: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Create or update a user record coming from Google OAuth.
 
         Returns the user document (with stringified `_id`).
@@ -311,8 +328,11 @@ class UserController:
             result = collection.insert_one(user_doc)
             user = collection.find_one({"_id": result.inserted_id})
 
-        user["_id"] = str(user["_id"])
-        return user
+        if user:
+            user["_id"] = str(user["_id"])
+            return user
+        else:
+            raise Exception("Failed to retrieve created user")
 
 
 class QuizController:
@@ -389,7 +409,9 @@ class QuizController:
         doc = collection.find_one({"topic": topic, "subtopic": subtopic})
         return doc.get("keywords", []) if doc else []
 
-    def get_style_modifiers_by_topic_subtopic(self, topic: str, subtopic: str) -> List[str]:
+    def get_style_modifiers_by_topic_subtopic(
+        self, topic: str, subtopic: str
+    ) -> List[str]:
         """Get style modifiers for a specific topic and subtopic"""
         collection = self._get_collection()
         doc = collection.find_one({"topic": topic, "subtopic": subtopic})
@@ -551,11 +573,24 @@ class QuestionsController:
     def _get_collection(self):
         if self.collection is None:
             if self.db_controller.db is None:
-                raise Exception("Database not connected. Call db_controller.connect() first.")
+                raise Exception(
+                    "Database not connected. Call db_controller.connect() first."
+                )
             self.collection = self.db_controller.get_collection(self.collection_name)
         return self.collection
 
-    def add_question(self, user_id: str, username: str, question_text: str, keyword: str, category: str, subject: str, difficulty: int, ai_generated: bool = True, extra: Dict[str, Any] = None) -> str:
+    def add_question(
+        self,
+        user_id: str,
+        username: str,
+        question_text: str,
+        keyword: str,
+        category: str,
+        subject: str,
+        difficulty: int,
+        ai_generated: bool = True,
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> str:
         collection = self._get_collection()
         doc = {
             "user_id": user_id,
@@ -585,14 +620,20 @@ class QuestionsController:
         except Exception:
             return None
 
-    def get_questions_by_user(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_questions_by_user(
+        self, user_id: str, limit: int = 50
+    ) -> List[Dict[str, Any]]:
         collection = self._get_collection()
-        docs = list(collection.find({"user_id": user_id}).sort("created_at", -1).limit(limit))
+        docs = list(
+            collection.find({"user_id": user_id}).sort("created_at", -1).limit(limit)
+        )
         for d in docs:
             d["_id"] = str(d["_id"])
         return docs
 
-    def get_random_questions(self, count: int = 10, category: str = None) -> List[Dict[str, Any]]:
+    def get_random_questions(
+        self, count: int = 10, category: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         collection = self._get_collection()
         pipeline = []
         if category:
@@ -615,16 +656,23 @@ class TopTenController:
     def _get_collection(self):
         if self.collection is None:
             if self.db_controller.db is None:
-                raise Exception("Database not connected. Call db_controller.connect() first.")
+                raise Exception(
+                    "Database not connected. Call db_controller.connect() first."
+                )
             self.collection = self.db_controller.get_collection(self.collection_name)
         return self.collection
 
-    def add_or_update_entry(self, username: str, score: int, meta: Dict[str, Any] = None) -> bool:
+    def add_or_update_entry(
+        self, username: str, score: int, meta: Optional[Dict[str, Any]] = None
+    ) -> bool:
         collection = self._get_collection()
         now = datetime.now()
-        result = collection.update_one(
+        collection.update_one(
             {"username": username},
-            {"$set": {"score": score, "meta": meta or {}, "updated_at": now}, "$setOnInsert": {"created_at": now}},
+            {
+                "$set": {"score": score, "meta": meta or {}, "updated_at": now},
+                "$setOnInsert": {"created_at": now},
+            },
             upsert=True,
         )
         return True

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from .dbcontroller import DBController
 
@@ -15,16 +15,23 @@ class TopTenController:
     def _get_collection(self):
         if self.collection is None:
             if self.db_controller.db is None:
-                raise Exception("Database not connected. Call db_controller.connect() first.")
+                raise Exception(
+                    "Database not connected. Call db_controller.connect() first."
+                )
             self.collection = self.db_controller.get_collection(self.collection_name)
         return self.collection
 
-    def add_or_update_entry(self, username: str, score: int, meta: Dict[str, Any] = None) -> bool:
+    def add_or_update_entry(
+        self, username: str, score: int, meta: Optional[Dict[str, Any]] = None
+    ) -> bool:
         collection = self._get_collection()
         now = datetime.now()
         collection.update_one(
             {"username": username},
-            {"$set": {"score": score, "meta": meta or {}, "updated_at": now}, "$setOnInsert": {"created_at": now}},
+            {
+                "$set": {"score": score, "meta": meta or {}, "updated_at": now},
+                "$setOnInsert": {"created_at": now},
+            },
             upsert=True,
         )
         return True

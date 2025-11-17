@@ -4,10 +4,8 @@ import os
 import logging
 from typing import List, Optional
 
-# Add the db directory to the path so we can import our controllers
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "db"))
-
-from db.dbcontroller import DBController, QuizController
+from models.dbcontroller import DBController
+from models.quiz_controller import QuizController
 
 logger = logging.getLogger(__name__)
 
@@ -68,29 +66,41 @@ class QuizService:
 
     def get_random_keyword(self, category: str, subject: str) -> Optional[str]:
         """Return a random keyword for a given category and subject."""
-        logger.debug("fetching_random_keyword category=%s subject=%s", category, subject)
+        logger.debug(
+            "fetching_random_keyword category=%s subject=%s", category, subject
+        )
         quiz_controller = self._ensure_connection()
         keywords = quiz_controller.get_keywords_by_topic_subtopic(category, subject)
         keyword = random.choice(keywords) if keywords else None
         if keyword:
             logger.debug("random_keyword_selected keyword=%s", keyword)
         else:
-            logger.warning("no_keywords_available category=%s subject=%s", category, subject)
+            logger.warning(
+                "no_keywords_available category=%s subject=%s", category, subject
+            )
         return keyword
 
     def get_random_style_modifier(self, category: str, subject: str) -> Optional[str]:
         """Return a random style modifier for a given category and subject."""
-        logger.debug("fetching_random_style_modifier category=%s subject=%s", category, subject)
+        logger.debug(
+            "fetching_random_style_modifier category=%s subject=%s", category, subject
+        )
         quiz_controller = self._ensure_connection()
-        style_modifiers = quiz_controller.get_style_modifiers_by_topic_subtopic(category, subject)
-        
+        style_modifiers = quiz_controller.get_style_modifiers_by_topic_subtopic(
+            category, subject
+        )
+
         # Check if list has items (empty list [] is truthy but has no items)
         if style_modifiers and len(style_modifiers) > 0:
             style_modifier = random.choice(style_modifiers)
-            logger.debug("random_style_modifier_selected style_modifier=%s", style_modifier)
+            logger.debug(
+                "random_style_modifier_selected style_modifier=%s", style_modifier
+            )
             return style_modifier
         else:
-            logger.warning("no_style_modifiers_available category=%s subject=%s", category, subject)
+            logger.warning(
+                "no_style_modifiers_available category=%s subject=%s", category, subject
+            )
             return None
 
     def get_random_keywords_from_category(
