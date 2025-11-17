@@ -243,7 +243,6 @@ See the [GitOps repository](https://github.com/liav-hasson/quiz-app-gitops.git) 
 - Multi-language support
 - Offline mode with local caching
 
----
 
 ## Testing
 

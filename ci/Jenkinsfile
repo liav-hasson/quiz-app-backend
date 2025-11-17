@@ -84,12 +84,16 @@ pipeline {
                     checkout scm
 
                     // Determine deployment environment based on branch
-                    if (env.BRANCH_NAME == 'main') {
+                    // Try multiple sources for branch name
+                    def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'unknown'
+                    echo "Detected branch: ${branchName}"
+                    
+                    if (branchName == 'main' || branchName == 'origin/main' || branchName == 'refs/heads/main') {
                         env.DEPLOY_ENV = 'prod'
-                        echo "Branch: ${env.BRANCH_NAME} → Deploying to PRODUCTION"
+                        echo "Branch: ${branchName} → Deploying to PRODUCTION"
                     } else {
                         env.DEPLOY_ENV = 'dev'
-                        echo "Branch: ${env.BRANCH_NAME} → Deploying to DEVELOPMENT"
+                        echo "Branch: ${branchName} → Deploying to DEVELOPMENT"
                     }
 
                     def semver = sh(returnStdout: true, script: './scripts/compute_next_version.sh . auto').trim()
