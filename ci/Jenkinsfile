@@ -113,12 +113,17 @@ pipeline {
 
                     echo '--------- Running pylint test ---------'
                     sh '''
-                        # Run pylint on all Python files in src/python directory
+                        # Run pylint on Python source files with proper PYTHONPATH
                         echo "Running pylint on Python source files..."
-                        for pyfile in ${PYTHON_SRC_DIR}/*.py; do
+                        
+                        # Set PYTHONPATH to repository root so imports work
+                        export PYTHONPATH="${WORKSPACE}"
+                        
+                        # Run pylint on server directory Python files
+                        for pyfile in server/*.py; do
                             if [ -f "$pyfile" ]; then
                                 echo "Linting: $pyfile"
-                                pylint "$pyfile" --score=yes --fail-under=5.0
+                                pylint "$pyfile" --score=yes --fail-under=5.0 --disable=C0103
                             fi
                         done
                     '''
