@@ -77,6 +77,14 @@ pipeline {
                 script {
                     echo '--------- Preparing image version ---------'
                     checkout scm
+                    
+                    // Fetch tags explicitly (Jenkins SCM checkout doesn't fetch tags by default)
+                    sh '''
+                        echo "Fetching git tags..."
+                        git fetch --tags
+                        echo "Available tags:"
+                        git tag -l | sort -V | tail -5
+                    '''
 
                     // Determine environment based on branch
                     if (env.BRANCH_NAME == 'main') {
@@ -87,23 +95,16 @@ pipeline {
                         echo "Building for DEVELOPMENT (${env.BRANCH_NAME} branch)"
                     }
 
+                    // Compute semantic version (script will fail if no tag exists)
                     def semver = sh(returnStdout: true, script: './scripts/compute_next_version.sh . auto').trim()
-                    if (semver) {
-                        echo "Computed semantic version: ${semver}"
-                        // Add -dev suffix for non-main branches
-                        if (env.DEPLOY_ENV == 'dev') {
-                            env.IMAGE_TAG = "${semver}-dev"
-                            echo "Added -dev suffix for dev environment"
-                        } else {
-                            env.IMAGE_TAG = semver
-                        }
+                    echo "Computed semantic version: ${semver}"
+                    
+                    // Add -dev suffix for non-main branches
+                    if (env.DEPLOY_ENV == 'dev') {
+                        env.IMAGE_TAG = "${semver}-dev"
+                        echo "Added -dev suffix for dev environment"
                     } else {
-                        echo "No semantic version computed; falling back to date-based tag: ${env.BUILD_TAG}"
-                        if (env.DEPLOY_ENV == 'dev') {
-                            env.IMAGE_TAG = "${env.BUILD_TAG}-dev"
-                        } else {
-                            env.IMAGE_TAG = env.BUILD_TAG
-                        }
+                        env.IMAGE_TAG = semver
                     }
                     
                     echo "Final image tag: ${env.IMAGE_TAG}"

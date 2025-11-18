@@ -83,8 +83,10 @@ decide_bump_from_commits() {
 }
 
 LATEST_TAG=$(get_latest_tag)
-if [[ -z "$LATEST_TAG" ]]; then
-  LATEST_TAG="v0.0.0"
+if [[ -z "$LATEST_TAG" ]] || [[ "$LATEST_TAG" == "v0.0.0" ]]; then
+  echo "[compute_next_version] ERROR: No semantic version tag found in repository!" >&2
+  echo "[compute_next_version] Please create an initial tag (e.g., git tag -a v1.0.0 -m 'Initial release')" >&2
+  exit 1
 fi
 parse_tag "$LATEST_TAG"
 
@@ -95,16 +97,9 @@ case "$MODE" in
       COMMITS="$COMMIT_MESSAGES"
       echo "[compute_next_version] Using COMMIT_MESSAGES env (length=$(echo -n "$COMMITS" | wc -c))" >&2
     else
-      # Collect commit subjects since the last tag
-      if [ "$LATEST_TAG" = "v0.0.0" ]; then
-        # No previous tag in git - look at recent commits only (last 7 days or 50 commits max)
-        COMMITS=$(git log --pretty=%s --no-merges --since="7 days ago" -n 50 2>/dev/null || true)
-        echo "[compute_next_version] No git tag found; collecting recent commits (last 7 days or 50 max)" >&2
-      else
-        # Tag exists in git - get commits since that tag
-        COMMITS=$(git log --pretty=%s --no-merges "$LATEST_TAG"..HEAD 2>/dev/null || true)
-        echo "[compute_next_version] Using git tag $LATEST_TAG as baseline" >&2
-      fi
+      # Tag exists in git - get commits since that tag
+      COMMITS=$(git log --pretty=%s --no-merges "$LATEST_TAG"..HEAD 2>/dev/null || true)
+      echo "[compute_next_version] Using git tag $LATEST_TAG as baseline" >&2
       
       # Count commits for diagnostics
       COMMIT_COUNT=$(echo "$COMMITS" | grep -c . || echo "0")
