@@ -241,7 +241,7 @@ See the [GitOps repository](https://github.com/liav-hasson/quiz-app-gitops.git) 
 - Quiz session history and analytics dashboard
 - Question difficulty adaptive learning
 - Multi-language support
-- Offline mode with local caching
+- Offline mode with local caching.
 
 
 ## Testing
