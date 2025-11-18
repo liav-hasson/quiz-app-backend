@@ -82,18 +82,36 @@ pipeline {
                     echo '--------- Preparing image version ---------'
                     checkout scm
 
-                    env.DEPLOY_ENV = 'prod'
+                    // Determine environment based on branch
+                    if (env.BRANCH_NAME == 'main') {
+                        env.DEPLOY_ENV = 'prod'
+                        echo "Building for PRODUCTION (main branch)"
+                    } else {
+                        env.DEPLOY_ENV = 'dev'
+                        echo "Building for DEVELOPMENT (${env.BRANCH_NAME} branch)"
+                    }
 
                     def semver = sh(returnStdout: true, script: './scripts/compute_next_version.sh . auto').trim()
                     if (semver) {
                         echo "Computed semantic version: ${semver}"
-                        env.IMAGE_TAG = semver
+                        // Add -dev suffix for non-main branches
+                        if (env.DEPLOY_ENV == 'dev') {
+                            env.IMAGE_TAG = "${semver}-dev"
+                            echo "Added -dev suffix for dev environment"
+                        } else {
+                            env.IMAGE_TAG = semver
+                        }
                     } else {
                         echo "No semantic version computed; falling back to date-based tag: ${env.BUILD_TAG}"
-                        env.IMAGE_TAG = env.BUILD_TAG
+                        if (env.DEPLOY_ENV == 'dev') {
+                            env.IMAGE_TAG = "${env.BUILD_TAG}-dev"
+                        } else {
+                            env.IMAGE_TAG = env.BUILD_TAG
+                        }
                     }
                     
                     echo "Final image tag: ${env.IMAGE_TAG}"
+                    echo "Deploy environment: ${env.DEPLOY_ENV}"
                 }
             }
         }
