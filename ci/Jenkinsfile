@@ -34,7 +34,6 @@ pipeline {
     }
 
     environment {
-        PIPELINE_STATUS       = "SUCCESS"
         BUILD_TAG             = "${BUILD_TIMESTAMP}"
         
         // Generates DOCKERHUB_CREDENTIALS_USR, DOCKERHUB_CREDENTIALS_PSW
@@ -97,13 +96,6 @@ pipeline {
                     echo "Final image tag: ${env.IMAGE_TAG}"
                 }
             }
-            post {
-                failure {
-                    script {
-                        env.PIPELINE_STATUS = "FAILURE"
-                    }
-                }
-            }
         }
 
         stage('Testing stage') {
@@ -147,7 +139,7 @@ pipeline {
                             exit 1
                         }
                         
-                        echo "✅ Validation tests passed (4/16 tests currently enabled)"
+                        echo "Validation tests passed (4/16 tests currently enabled)"
                     '''
                     echo 'Unit tests completed!'
 
@@ -169,13 +161,6 @@ pipeline {
                         }
                     '''
                     echo 'Dependency vulnerability scan passed!'
-                }
-            }
-            post {
-                failure {
-                    script {
-                        env.PIPELINE_STATUS = "FAILURE"
-                    }
                 }
             }
         }
@@ -205,11 +190,6 @@ pipeline {
                 }
             }
             post {
-                failure {
-                    script {
-                        env.PIPELINE_STATUS = "FAILURE"
-                    }
-                }
                 always {
                     // Archive the Bandit report for review
                     archiveArtifacts artifacts: 'bandit-report.json', allowEmptyArchive: true
@@ -243,11 +223,6 @@ pipeline {
                 }
             }
             post {
-                failure {
-                    script {
-                        env.PIPELINE_STATUS = "FAILURE"
-                    }
-                }
                 always {
                     // Archive the Hadolint report for review
                     archiveArtifacts artifacts: 'hadolint-report.json', allowEmptyArchive: true
@@ -273,15 +248,7 @@ pipeline {
                     '''
                 }
             }
-            post {
-                failure {
-                    script {
-                        env.PIPELINE_STATUS = "FAILURE"
-                    }
-                }
-            }
         }
-
 
         stage('Update GitOps Repository') {
             steps {
@@ -314,9 +281,6 @@ pipeline {
                     echo "ArgoCD will detect changes and deploy automatically"
                 }
                 failure {
-                    script {
-                        env.PIPELINE_STATUS = "FAILURE"
-                    }
                     echo "❌ Failed to update GitOps repository"
                 }
             }
@@ -361,9 +325,6 @@ pipeline {
                     echo "✅ Application tagged with version ${env.IMAGE_TAG}"
                 }
                 failure {
-                    script {
-                        env.PIPELINE_STATUS = "FAILURE"
-                    }
                     echo "❌ Failed to tag application release"
                 }
             }
