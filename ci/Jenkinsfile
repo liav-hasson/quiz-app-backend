@@ -69,10 +69,6 @@ pipeline {
 
         // CI resources directory
         CI_DIR                = "ci"
-        
-        // Environment detection (prod vs dev)
-        // Will be set dynamically in Prepare stage based on branch
-        DEPLOY_ENV            = ""
     }
 
     stages {
