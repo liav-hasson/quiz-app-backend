@@ -348,13 +348,14 @@ pipeline {
     post {
         always {
             script {
-                def statusIcon = env.PIPELINE_STATUS == "SUCCESS" ? "✅" : "❌"
-                def color = env.PIPELINE_STATUS == "SUCCESS" ? "good" : "danger"
-                def slackMessage = env.PIPELINE_STATUS == "SUCCESS" ? 
+                def buildResult = currentBuild.result ?: 'SUCCESS'
+                def statusIcon = buildResult == "SUCCESS" ? "✅" : "❌"
+                def color = buildResult == "SUCCESS" ? "good" : "danger"
+                def slackMessage = buildResult == "SUCCESS" ? 
                     "✅ GitOps update completed! Sync ArgoCD to deploy!" : 
                     "❌ Pipeline failed - check logs for details"
                 def finalMessage = [
-                    "${statusIcon} GitOps Pipeline *${env.JOB_NAME}* #${env.BUILD_NUMBER} ${env.PIPELINE_STATUS}",
+                    "${statusIcon} GitOps Pipeline *${env.JOB_NAME}* #${env.BUILD_NUMBER} ${buildResult}",
                     "",
                     "*Environment:* ${env.DEPLOY_ENV?.toUpperCase() ?: 'UNKNOWN'}",
                     "*Branch:* ${env.BRANCH_NAME}",
@@ -371,8 +372,9 @@ pipeline {
 
             // Report status back to GitHub using Commit Status API
             script {
-                def status = env.PIPELINE_STATUS == "SUCCESS" ? "success" : "failure"
-                def description = env.PIPELINE_STATUS == "SUCCESS" ? 
+                def buildResult = currentBuild.result ?: 'SUCCESS'
+                def status = buildResult == "SUCCESS" ? "success" : "failure"
+                def description = buildResult == "SUCCESS" ? 
                     "Jenkins build passed" : 
                     "Jenkins build failed"
                     
