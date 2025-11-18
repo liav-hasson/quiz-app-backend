@@ -22,24 +22,17 @@ cd "$REPO_DIR"
 
 # Helper: get latest semver tag from git repository
 get_latest_tag() {
-  # First, try to get the latest tag from git
-  local git_tag=$(git describe --tags --abbrev=0 --match "v[0-9]*.[0-9]*.[0-9]*" 2>/dev/null || echo "")
+  # Get all semver tags and sort by version to find the highest
+  # Use sort -V for proper version sorting (v1.0.0 > v0.0.1)
+  local git_tag=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" | sort -V | tail -n1 || echo "")
   
   if [[ -n "$git_tag" ]]; then
     echo "$git_tag"
     return
   fi
   
-  # Fallback: try to find any semver tag in git
-  git_tag=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" | sort -V | tail -n1 || echo "")
-  
-  if [[ -n "$git_tag" ]]; then
-    echo "$git_tag"
-    return
-  fi
-  
-  # No git tags found - start from v0.0.0
-  echo "v0.0.0"
+  # No git tags found - return empty (will cause error in main script)
+  echo ""
 }
 
 # Parse tag into MAJOR MINOR PATCH
