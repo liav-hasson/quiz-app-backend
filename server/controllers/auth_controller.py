@@ -5,6 +5,8 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Tuple
 import jwt
+from google.oauth2 import id_token
+from google.auth.transport import requests
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +87,79 @@ class AuthController:
         except Exception as e:
             logger.error("oauth_callback_failed %s", str(e), exc_info=True)
             return {"error": "OAuth callback failed"}, 500
+
+    def handle_google_token_login(
+        self, google_id_token: str
+    ) -> Tuple[Dict[str, Any], int]:
+        """
+        Handle Google ID token from frontend and issue application JWT.
+
+        This method verifies the Google ID token sent from the frontend,
+        extracts user information, and returns your application's JWT token.
+
+        Args:
+            google_id_token: The Google ID token received from frontend
+
+        Returns:
+            Tuple of (response_data, status_code)
+            Response contains: email, name, picture, token (your JWT)
+        """
+        try:
+            # Get Google OAuth client ID from environment
+            google_client_id = os.getenv("GOOGLE_CLIENT_ID")
+            if not google_client_id:
+                logger.error("google_client_id_not_configured")
+                return {"error": "OAuth not properly configured"}, 500
+
+            # Verify the Google ID token
+            try:
+                idinfo = id_token.verify_oauth2_token(
+                    google_id_token, requests.Request(), google_client_id
+                )
+            except ValueError as e:
+                logger.warning("invalid_google_token error=%s", str(e))
+                return {"error": "Invalid Google token"}, 401
+
+            # Extract user information from verified token
+            google_id = idinfo.get("sub")
+            email = idinfo.get("email")
+            name = idinfo.get("name")
+            picture = idinfo.get("picture")
+            email_verified = idinfo.get("email_verified", False)
+
+            if not google_id or not email:
+                logger.warning("incomplete_google_token_data")
+                return {"error": "Incomplete user information from Google"}, 400
+
+            if not email_verified:
+                logger.warning("unverified_email email=%s", email)
+                return {"error": "Email not verified by Google"}, 400
+
+            logger.info("google_token_verified google_id=%s email=%s", google_id, email)
+
+            # Create or update user in database
+            user = self.user_controller.create_or_update_google_user(
+                google_id=google_id, email=email, name=name, picture=picture
+            )
+
+            # Generate your application's JWT token
+            app_token = self._generate_jwt(user)
+
+            logger.info(
+                "token_login_successful user_id=%s email=%s", user.get("_id"), email
+            )
+
+            # Return the response in your desired format
+            return {
+                "email": email,
+                "name": name,
+                "picture": picture,
+                "token": app_token,
+            }, 200
+
+        except Exception as e:
+            logger.error("google_token_login_failed error=%s", str(e), exc_info=True)
+            return {"error": "Failed to process Google token"}, 500
 
     def process_google_oauth_callback(
         self,
