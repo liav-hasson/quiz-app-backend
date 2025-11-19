@@ -5,7 +5,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from utils.quiz_utils import (
     get_categories,
     get_subjects,
-    get_all_subjects,
+    get_categories_with_subjects,
     get_random_keyword,
     get_random_style_modifier,
 )
@@ -67,29 +67,31 @@ class QuizController:
             return {"error": f"Failed to get subjects: {str(e)}"}, 500
 
     @staticmethod
-    def handle_get_all_subjects() -> Tuple[Dict[str, Any], int]:
+    def handle_get_categories_with_subjects() -> Tuple[Dict[str, Any], int]:
         """
-        Handle request to get all subjects for all categories.
+        Handle request to get all categories with their subjects.
 
-        This combined endpoint reduces API calls by returning all subjects
-        for all categories in a single response.
+        This combined endpoint reduces API calls by returning all categories
+        and their associated subjects in a single response.
 
         Returns:
             Tuple of (response_data, status_code)
         """
         try:
-            logger.info("fetching_all_subjects")
-            data = get_all_subjects()
+            logger.info("fetching_categories_with_subjects")
+            data = get_categories_with_subjects()
             total_subjects = sum(len(subjects) for subjects in data.values())
             logger.info(
-                "all_subjects_fetched category_count=%d total_subjects=%d",
+                "categories_with_subjects_fetched category_count=%d total_subjects=%d",
                 len(data),
                 total_subjects,
             )
             return {"data": data}, 200
         except Exception as e:
-            logger.error("all_subjects_fetch_failed error=%s", str(e), exc_info=True)
-            return {"error": f"Failed to get all subjects: {str(e)}"}, 500
+            logger.error(
+                "categories_with_subjects_fetch_failed error=%s", str(e), exc_info=True
+            )
+            return {"error": f"Failed to get categories with subjects: {str(e)}"}, 500
 
     @staticmethod
     def handle_generate_question(data: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:

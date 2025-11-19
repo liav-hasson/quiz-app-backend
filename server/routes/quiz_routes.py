@@ -21,10 +21,10 @@ def get_subjects():
     return jsonify(response_data), status_code
 
 
-@quiz_bp.route("/all-subjects")
-def get_all_subjects():
-    """Get all subjects for all categories in a single call."""
-    response_data, status_code = QuizController.handle_get_all_subjects()
+@quiz_bp.route("/categories-with-subjects")
+def get_categories_with_subjects():
+    """Get all categories with their subjects in a single call."""
+    response_data, status_code = QuizController.handle_get_categories_with_subjects()
     return jsonify(response_data), status_code
 
 

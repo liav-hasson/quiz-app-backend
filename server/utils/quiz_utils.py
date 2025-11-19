@@ -96,14 +96,14 @@ class QuizService:
         logger.debug("subjects_fetched category=%s count=%d", category, len(subjects))
         return subjects
 
-    def get_all_subjects(self) -> dict:
-        """Return all subjects for all categories in a single call.
+    def get_categories_with_subjects(self) -> dict:
+        """Return all categories with their subjects in a single call.
 
         Returns:
             dict: Dictionary mapping category names to lists of subjects.
                   Example: {"Python": ["Basics", "Advanced"], "DevOps": ["Docker"]}
         """
-        logger.debug("fetching_all_subjects")
+        logger.debug("fetching_categories_with_subjects")
         quiz_controller = self._ensure_connection()
         categories = quiz_controller.get_all_topics()
 
@@ -113,7 +113,7 @@ class QuizService:
             result[category] = subjects
 
         logger.debug(
-            "all_subjects_fetched category_count=%d total_subjects=%d",
+            "categories_with_subjects_fetched category_count=%d total_subjects=%d",
             len(result),
             sum(len(subjects) for subjects in result.values()),
         )
@@ -244,7 +244,7 @@ class QuizService:
         Args:
             search_term: Term to search for in keywords.
 
-        Returns:
+        Returns:dded Branch Detection
             List[dict]: List of matching documents.
         """
         quiz_controller = self._ensure_connection()
@@ -281,13 +281,13 @@ def get_subjects(category: str) -> List[str]:
     return _quiz_service.get_subjects(category)
 
 
-def get_all_subjects() -> dict:
-    """Return all subjects for all categories in a single call.
+def get_categories_with_subjects() -> dict:
+    """Return all categories with their subjects in a single call.
 
     Returns:
         dict: Dictionary mapping category names to lists of subjects.
     """
-    return _quiz_service.get_all_subjects()
+    return _quiz_service.get_categories_with_subjects()
 
 
 def get_random_keyword(category: str, subject: str) -> Optional[str]:
