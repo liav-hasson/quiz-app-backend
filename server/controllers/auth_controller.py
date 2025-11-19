@@ -23,27 +23,31 @@ class AuthController:
         """Set OAuth instance (called during initialization)."""
         self.oauth = oauth_instance
 
-    def handle_login(self, request_url_root: str) -> Tuple[Any, int]:
+    def handle_login(self, request_url_root: str, data: dict) -> Tuple[Any, int]:
         """
-        Handle OAuth login request.
-
-        Args:
-            request_url_root: Request URL root for building redirect URI
-
-        Returns:
-            Tuple of (redirect_response or error_dict, status_code)
+        Handle login with Google user data sent directly from frontend.
         """
-        if self.oauth is None:
-            logger.error("oauth_not_initialized")
-            return {"error": "OAuth not initialized"}, 500
-
-        redirect_uri = request_url_root.rstrip("/") + "/api/auth/callback"
-
         try:
-            return self.oauth.google.authorize_redirect(redirect_uri), 200  # type: ignore
+            google_id = data.get("id")
+            email = data.get("email")
+            name = data.get("name")
+
+            if not google_id or not email:
+                return {"error": "google_id and email are required"}, 400
+
+            # --- Check if user exists (by google_id or email) ---
+            user = self.user_controller.create_or_update_google_user(
+                google_id=google_id,
+                email=email,
+                name=name,
+            )
+
+            # Return the user object
+            return user, 200
+
         except Exception as e:
-            logger.error("oauth_login_failed %s", str(e), exc_info=True)
-            return {"error": "OAuth login failed"}, 500
+            logger.error("login_failed %s", str(e), exc_info=True)
+            return {"error": "Internal login error"}, 500
 
     def handle_callback(self) -> Tuple[Dict[str, Any], int]:
         """
