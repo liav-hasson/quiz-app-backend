@@ -81,33 +81,37 @@ if [[ -z "$LATEST_TAG" ]] || [[ "$LATEST_TAG" == "v0.0.0" ]]; then
   echo "[compute_next_version] Please create an initial tag (e.g., git tag -a v1.0.0 -m 'Initial release')" >&2
   exit 1
 fi
+echo "[compute_next_version] Using git tag: $LATEST_TAG as baseline" >&2
 parse_tag "$LATEST_TAG"
-
 case "$MODE" in
   auto)
+    # Get current branch name
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "HEAD")
+    echo "[compute_next_version] Current branch: $CURRENT_BRANCH" >&2
+    
     # Use COMMIT_MESSAGES env if set, otherwise collect via git
     if [[ -n "${COMMIT_MESSAGES:-}" ]]; then
       COMMITS="$COMMIT_MESSAGES"
       echo "[compute_next_version] Using COMMIT_MESSAGES env (length=$(echo -n "$COMMITS" | wc -c))" >&2
     else
-      # Tag exists in git - get commits since that tag
-      COMMITS=$(git log --pretty=%s --no-merges "$LATEST_TAG"..HEAD 2>/dev/null || true)
-      echo "[compute_next_version] Using git tag $LATEST_TAG as baseline" >&2
+      # Get commits since the latest tag on current branch only
+      # This prevents counting commits from other branches
+      COMMITS=$(git log --pretty=%s --no-merges "$LATEST_TAG"..HEAD --first-parent 2>/dev/null || true)
       
       # Count commits for diagnostics
       COMMIT_COUNT=$(echo "$COMMITS" | grep -c . || echo "0")
-      echo "[compute_next_version] Collected $COMMIT_COUNT commit messages since $LATEST_TAG" >&2
+      echo "[compute_next_version] Collected $COMMIT_COUNT commit(s) on current branch since $LATEST_TAG" >&2
     fi
 
     # Trim whitespace and check if we have actual commits
     COMMITS_TRIMMED=$(echo "$COMMITS" | xargs)
     if [[ -z "$COMMITS_TRIMMED" ]]; then
-      # fallback to patch if no commits/messages
+      # No new commits - use patch bump for dev environments to avoid conflicts
       BUMP=patch
       echo "[compute_next_version] No new commits found; defaulting to patch bump" >&2
     else
       BUMP=$(decide_bump_from_commits "$COMMITS")
-      echo "[compute_next_version] Determined bump: $BUMP" >&2
+      echo "[compute_next_version] Determined bump: $BUMP (based on commit prefixes)" >&2
       echo "[compute_next_version] Sample commits: $(echo "$COMMITS" | head -n 3)" >&2
     fi
     ;;
@@ -138,4 +142,5 @@ esac
 
 NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
 
+echo "[compute_next_version] Computed version: $LATEST_TAG → $NEW_TAG (bump: $BUMP)" >&2
 echo "$NEW_TAG"
