@@ -141,7 +141,6 @@ class UserController:
         google_id: str,
         email: str,
         name: Optional[str] = None,
-        picture: Optional[str] = None,
     ) -> Dict[str, Any]:
         collection = self._get_collection()
 
@@ -157,7 +156,6 @@ class UserController:
             update_doc = {
                 "email": email,
                 "name": name,
-                "profile_picture": picture,
                 "google_id": google_id,
                 "updated_at": now,
             }
@@ -170,7 +168,6 @@ class UserController:
                 "username": username,
                 "email": email,
                 "name": name,
-                "profile_picture": picture,
                 "google_id": google_id,
                 "experience": 0,
                 "questions_count": 0,

@@ -21,8 +21,9 @@ def login():
     """Start Google OAuth login flow."""
     if auth_controller is None:
         return jsonify({"error": "Service not initialized"}), 503
+    data = request.get_json()
 
-    result, status_code = auth_controller.handle_login(request.url_root)
+    result, status_code = auth_controller.handle_login(request.url_root, data)
     if status_code == 200:
         return result  # Returning data.
     return jsonify(result), status_code
