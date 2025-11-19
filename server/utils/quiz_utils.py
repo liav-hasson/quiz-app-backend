@@ -96,6 +96,29 @@ class QuizService:
         logger.debug("subjects_fetched category=%s count=%d", category, len(subjects))
         return subjects
 
+    def get_all_subjects(self) -> dict:
+        """Return all subjects for all categories in a single call.
+
+        Returns:
+            dict: Dictionary mapping category names to lists of subjects.
+                  Example: {"Python": ["Basics", "Advanced"], "DevOps": ["Docker"]}
+        """
+        logger.debug("fetching_all_subjects")
+        quiz_controller = self._ensure_connection()
+        categories = quiz_controller.get_all_topics()
+
+        result = {}
+        for category in categories:
+            subjects = quiz_controller.get_subtopics_by_topic(category)
+            result[category] = subjects
+
+        logger.debug(
+            "all_subjects_fetched category_count=%d total_subjects=%d",
+            len(result),
+            sum(len(subjects) for subjects in result.values()),
+        )
+        return result
+
     def get_keywords(self, category: str, subject: str) -> List[str]:
         """Return all keywords for a given category and subject.
 
@@ -256,6 +279,15 @@ def get_subjects(category: str) -> List[str]:
         List[str]: List of subject names.
     """
     return _quiz_service.get_subjects(category)
+
+
+def get_all_subjects() -> dict:
+    """Return all subjects for all categories in a single call.
+
+    Returns:
+        dict: Dictionary mapping category names to lists of subjects.
+    """
+    return _quiz_service.get_all_subjects()
 
 
 def get_random_keyword(category: str, subject: str) -> Optional[str]:

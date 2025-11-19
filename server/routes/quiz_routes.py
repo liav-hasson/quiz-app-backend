@@ -21,6 +21,13 @@ def get_subjects():
     return jsonify(response_data), status_code
 
 
+@quiz_bp.route("/all-subjects")
+def get_all_subjects():
+    """Get all subjects for all categories in a single call."""
+    response_data, status_code = QuizController.handle_get_all_subjects()
+    return jsonify(response_data), status_code
+
+
 @quiz_bp.route("/question/generate", methods=["POST"])
 def generate_question():
     """Generate a question."""
