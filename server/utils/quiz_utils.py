@@ -244,7 +244,7 @@ class QuizService:
         Args:
             search_term: Term to search for in keywords.
 
-        Returns:
+        Returns:dded Branch Detection
             List[dict]: List of matching documents.
         """
         quiz_controller = self._ensure_connection()

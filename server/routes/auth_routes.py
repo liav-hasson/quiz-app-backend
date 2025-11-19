@@ -16,7 +16,7 @@ def init_auth_routes(oauth_instance, user_controller):
     auth_controller = AuthController(user_controller, oauth_instance)
 
 
-@auth_bp.route("/login")
+@auth_bp.route("/login", methods=["POST"])
 def login():
     """Start Google OAuth login flow."""
     if auth_controller is None:
