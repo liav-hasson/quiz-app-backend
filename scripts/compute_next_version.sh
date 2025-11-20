@@ -20,20 +20,19 @@ MODE="${2:-patch}"
 
 cd "$REPO_DIR"
 
-# Helper: get latest semver tag from Docker Hub
+# Helper: get latest semver tag from git repository
 get_latest_tag() {
-  DOCKER_USER="${DOCKERHUB_CREDENTIALS_USR:-}"
-  DOCKER_IMAGE="${DOCKER_IMAGE_NAME:-}"
+  # Get all semver tags and sort by version to find the highest
+  # Use sort -V for proper version sorting (v1.0.0 > v0.0.1)
+  local git_tag=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" | sort -V | tail -n1 || echo "")
   
-  if [[ -n "$DOCKER_USER" ]] && [[ -n "$DOCKER_IMAGE" ]]; then
-    curl -s "https://hub.docker.com/v2/repositories/${DOCKER_USER}/${DOCKER_IMAGE}/tags?page_size=100" \
-      | grep -o '"name":"v[0-9]\+\.[0-9]\+\.[0-9]\+"' \
-      | cut -d'"' -f4 \
-      | sort -V \
-      | tail -n1 || echo "v0.0.0"
-  else
-    echo "v0.0.0"
+  if [[ -n "$git_tag" ]]; then
+    echo "$git_tag"
+    return
   fi
+  
+  # No git tags found - return empty (will cause error in main script)
+  echo ""
 }
 
 # Parse tag into MAJOR MINOR PATCH
@@ -77,8 +76,10 @@ decide_bump_from_commits() {
 }
 
 LATEST_TAG=$(get_latest_tag)
-if [[ -z "$LATEST_TAG" ]]; then
-  LATEST_TAG="v0.0.0"
+if [[ -z "$LATEST_TAG" ]] || [[ "$LATEST_TAG" == "v0.0.0" ]]; then
+  echo "[compute_next_version] ERROR: No semantic version tag found in repository!" >&2
+  echo "[compute_next_version] Please create an initial tag (e.g., git tag -a v1.0.0 -m 'Initial release')" >&2
+  exit 1
 fi
 parse_tag "$LATEST_TAG"
 
@@ -89,22 +90,13 @@ case "$MODE" in
       COMMITS="$COMMIT_MESSAGES"
       echo "[compute_next_version] Using COMMIT_MESSAGES env (length=$(echo -n "$COMMITS" | wc -c))" >&2
     else
-      # Collect commit subjects since the last tag
-      if [ "$LATEST_TAG" = "v0.0.0" ]; then
-        COMMITS=$(git log --pretty=%s --no-merges 2>/dev/null || true)
-        echo "[compute_next_version] No previous tag; collecting all commits" >&2
-      else
-        # Check if the tag exists locally before using it
-        if git rev-parse "$LATEST_TAG" >/dev/null 2>&1; then
-          COMMITS=$(git log --pretty=%s --no-merges "$LATEST_TAG"..HEAD 2>/dev/null || true)
-          echo "[compute_next_version] Using local tag $LATEST_TAG as baseline" >&2
-        else
-          # Tag from Docker Hub doesn't exist locally - get all commits
-          COMMITS=$(git log --pretty=%s --no-merges 2>/dev/null || true)
-          echo "[compute_next_version] Tag $LATEST_TAG from Docker Hub not found locally; using all commits" >&2
-        fi
-      fi
-      echo "[compute_next_version] Collected commit messages (count=$(echo "$COMMITS" | wc -l))" >&2
+      # Tag exists in git - get commits since that tag
+      COMMITS=$(git log --pretty=%s --no-merges "$LATEST_TAG"..HEAD 2>/dev/null || true)
+      echo "[compute_next_version] Using git tag $LATEST_TAG as baseline" >&2
+      
+      # Count commits for diagnostics
+      COMMIT_COUNT=$(echo "$COMMITS" | grep -c . || echo "0")
+      echo "[compute_next_version] Collected $COMMIT_COUNT commit messages since $LATEST_TAG" >&2
     fi
 
     # Trim whitespace and check if we have actual commits
@@ -112,11 +104,11 @@ case "$MODE" in
     if [[ -z "$COMMITS_TRIMMED" ]]; then
       # fallback to patch if no commits/messages
       BUMP=patch
-      echo "[compute_next_version] No commit messages found; defaulting to patch" >&2
+      echo "[compute_next_version] No new commits found; defaulting to patch bump" >&2
     else
       BUMP=$(decide_bump_from_commits "$COMMITS")
       echo "[compute_next_version] Determined bump: $BUMP" >&2
-      echo "[compute_next_version] Sample commits: $COMMITS" >&2
+      echo "[compute_next_version] Sample commits: $(echo "$COMMITS" | head -n 3)" >&2
     fi
     ;;
   major|minor|patch)
