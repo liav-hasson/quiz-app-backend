@@ -1,10 +1,10 @@
-"""User activity routes for answer tracking and leaderboard."""
+"""User activity routes for answer submission and leaderboard."""
 
 from flask import Blueprint, request, jsonify
 from typing import Optional
-from controllers.user_activity_controller import UserActivityController
+from controllers.user_activity_handler import UserActivityController
 
-user_activity_bp = Blueprint("user_activity", __name__, url_prefix="/api")
+user_activity_bp = Blueprint("user_activity", __name__, url_prefix="/api/user")
 
 # Will be set by server.py during initialization
 activity_controller: Optional[UserActivityController] = None

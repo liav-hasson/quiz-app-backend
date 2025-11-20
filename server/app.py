@@ -15,19 +15,19 @@ import time
 from typing import Optional
 
 from authlib.integrations.flask_client import OAuth
-from flask import Flask, g, request
+from flask import Flask, g, request, jsonify
 from prometheus_flask_exporter import PrometheusMetrics
 
 # Configuration
 from utils.config import Config
 
 # Database models
-from models.dbcontroller import DBController
-from models.user_controller import UserController
-from models.questions_controller import QuestionsController
-from models.topten_controller import TopTenController
-from models.quiz_controller import QuizController
-from models.migrator import DataMigrator
+from models.database import DBController
+from models.user_model import UserController
+from models.questions_model import QuestionsController
+from models.leaderboard_model import TopTenController
+from models.quiz_model import QuizController
+from models.data_migrator import DataMigrator
 
 # Routes
 from routes.health_routes import health_bp, init_health_routes
@@ -146,6 +146,85 @@ def initialize_routes() -> None:
 
 def setup_middleware() -> None:
     """Setup Flask middleware and request hooks."""
+
+    @app.before_request
+    def verify_user_email() -> Optional[tuple]:
+        """Verify that the email in the request exists in the database.
+
+        Returns:
+            Optional[tuple]: Error response if verification fails, None otherwise.
+        """
+        # Skip verification for specific routes
+        exempt_paths = [
+            "/api/health",
+            "/api/auth/",
+            "/metrics",
+            "/api/categories",
+            "/api/subjects",
+            "/api/all-subjects",
+        ]
+
+        # Check if current path should be exempted
+        if any(request.path.startswith(path) for path in exempt_paths):
+            return None
+
+        # Extract email from request
+        email = None
+
+        # Try to get email from JSON body
+        if request.is_json:
+            data = request.get_json(silent=True)
+            if data:
+                email = data.get("email") or data.get("user_email")
+
+        # Try to get email from query parameters
+        if not email:
+            email = request.args.get("email") or request.args.get("user_email")
+
+        # Try to get email from headers
+        if not email:
+            email = request.headers.get("X-User-Email") or request.headers.get(
+                "User-Email"
+            )
+
+        # If no email found, return error
+        if not email:
+            logger.warning(
+                "email_missing_in_request path=%s method=%s",
+                request.path,
+                request.method,
+            )
+            return jsonify({"error": "Email is required for this request"}), 400
+
+        # Verify user_controller is initialized
+        if not user_controller:
+            logger.error("user_controller_not_initialized")
+            return jsonify({"error": "Service not properly initialized"}), 503
+
+        # Verify email exists in database
+        try:
+            user = user_controller.get_user_by_email(email)
+            if not user:
+                logger.warning(
+                    "email_not_found_in_database email=%s path=%s", email, request.path
+                )
+                return jsonify({"error": "User not found. Please login first."}), 404
+
+            # Store user in g for use in route handlers
+            g.user = user
+            g.user_email = email
+            logger.debug("user_verified email=%s user_id=%s", email, user.get("_id"))
+
+        except Exception as e:
+            logger.error(
+                "email_verification_failed email=%s error=%s",
+                email,
+                str(e),
+                exc_info=True,
+            )
+            return jsonify({"error": "Failed to verify user"}), 500
+
+        return None
 
     @app.before_request
     def before_request() -> None:

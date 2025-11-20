@@ -1,7 +1,7 @@
 """Quiz routes for quiz-related endpoints."""
 
 from flask import Blueprint, request, jsonify
-from controllers.quiz_controller import QuizController
+from controllers.quiz_handler import QuizController
 
 quiz_bp = Blueprint("quiz", __name__, url_prefix="/api")
 
@@ -21,10 +21,10 @@ def get_subjects():
     return jsonify(response_data), status_code
 
 
-@quiz_bp.route("/categories-with-subjects")
-def get_categories_with_subjects():
-    """Get all categories with their subjects in a single call."""
-    response_data, status_code = QuizController.handle_get_categories_with_subjects()
+@quiz_bp.route("/all-subjects")
+def get_all_subjects():
+    """Get all subjects for all categories in a single call."""
+    response_data, status_code = QuizController.handle_get_all_subjects()
     return jsonify(response_data), status_code
 
 
