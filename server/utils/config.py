@@ -71,5 +71,5 @@ class Config:  # pylint: disable=too-few-public-methods
         "Tasks: \n" 
         "1. Review the student's answer based on the question, and expected difficulty. Expect a short response, no more than 5 sentences.\n" 
         "2. Give short, constructive feedback on the user's answer quality, note only on significant mistakes.\n" 
-        "3. Scoring: 10 = fully correct; 8–9 = mostly correct; 6–7 = partly correct; 4–5 = major gaps; 0–3 = mostly wrong."
-        'Return the following in Json format: { "score": "/10", "feedback": "" }' )
+        "3. Scoring: 10 = fully correct; 8–9 = mostly correct; 6–7 = partly correct; 4–5 = major gaps; 0–3 = mostly wrong.\n"
+        'Return the following in Json format: {{ "score": "/10", "feedback": "" }}' )
