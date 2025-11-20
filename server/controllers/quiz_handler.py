@@ -147,10 +147,11 @@ class QuizController:
             return {"error": str(e)}, 400
 
         try:
-            feedback = QuizController.evaluate_user_answer(
+            evaluation = QuizController.evaluate_user_answer(
                 question=data["question"], answer=data["answer"], difficulty=difficulty
             )
-            return {"feedback": feedback}, 200
+            # evaluation is now a dict with {score, feedback}
+            return evaluation, 200
         except Exception as e:
             logger.error("answer_evaluation_failed error=%s", str(e), exc_info=True)
             return {"error": f"Failed to evaluate answer: {str(e)}"}, 500
@@ -228,7 +229,7 @@ class QuizController:
         }
 
     @staticmethod
-    def evaluate_user_answer(question: str, answer: str, difficulty: int) -> str:
+    def evaluate_user_answer(question: str, answer: str, difficulty: int) -> Dict[str, Any]:
         """
         Evaluate a user's answer to a question.
 
@@ -238,18 +239,18 @@ class QuizController:
             difficulty: Difficulty level (1-3)
 
         Returns:
-            Feedback string from AI evaluation
+            Dict with score and feedback: {"score": "8/10", "feedback": "..."}
         """
         logger.info(
             "evaluating_answer difficulty=%d answer_length=%d", difficulty, len(answer)
         )
 
-        feedback = evaluate_answer(question, answer, difficulty)
+        evaluation = evaluate_answer(question, answer, difficulty)
 
         logger.info(
-            "answer_evaluated difficulty=%d feedback_length=%d",
+            "answer_evaluated difficulty=%d score=%s",
             difficulty,
-            len(feedback),
+            evaluation.get("score", "N/A"),
         )
 
-        return feedback
+        return evaluation

@@ -3,6 +3,7 @@ AI utilities for generating quiz questions and evaluating answers using OpenAI.
 """
 
 import logging
+import json
 import boto3
 from openai import OpenAI
 
@@ -155,12 +156,36 @@ def evaluate_answer(question, answer, difficulty, keyword=None):
         if hasattr(api_response, "usage") and api_response.usage is not None:
             tokens_used = api_response.usage.total_tokens
 
-        logger.info(
-            "openai_evaluate_answer_success difficulty=%d tokens_used=%d",
-            difficulty,
-            tokens_used,
-        )
-        return result
+        # Parse JSON response from AI
+        try:
+            evaluation = json.loads(result)
+            score = evaluation.get("score", "N/A")
+            feedback_text = evaluation.get("feedback", "No feedback provided")
+            
+            logger.info(
+                "openai_evaluate_answer_success difficulty=%d tokens_used=%d score=%s",
+                difficulty,
+                tokens_used,
+                score,
+            )
+            
+            # Return structured dict with score and feedback
+            return {
+                "score": score,
+                "feedback": feedback_text
+            }
+        except json.JSONDecodeError as json_err:
+            # Fallback: AI didn't return valid JSON, treat as plain feedback
+            logger.warning(
+                "ai_response_not_json difficulty=%d error=%s, treating as plain text",
+                difficulty,
+                str(json_err)
+            )
+            return {
+                "score": "N/A",
+                "feedback": result
+            }
+        
     except Exception as e:
         logger.error(
             "openai_evaluate_answer_failed difficulty=%d error=%s",
