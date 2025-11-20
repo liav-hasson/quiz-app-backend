@@ -99,10 +99,11 @@ pipeline {
                     def semver = sh(returnStdout: true, script: './scripts/compute_next_version.sh . auto').trim()
                     echo "Computed semantic version: ${semver}"
                     
-                    // Add -dev suffix for non-main branches
+                    // Add -dev suffix with git SHA for non-main branches to ensure unique tags
                     if (env.DEPLOY_ENV == 'dev') {
-                        env.IMAGE_TAG = "${semver}-dev"
-                        echo "Added -dev suffix for dev environment"
+                        def gitSha = sh(returnStdout: true, script: 'git rev-parse --short=8 HEAD').trim()
+                        env.IMAGE_TAG = "${semver}-dev-${gitSha}"
+                        echo "Added -dev suffix with git SHA for dev environment: ${gitSha}"
                     } else {
                         env.IMAGE_TAG = semver
                     }
