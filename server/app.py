@@ -156,7 +156,7 @@ def setup_middleware() -> None:
         """
         # Skip verification for specific routes
         exempt_paths = [
-            "/api/health"
+            "/api/health",
             "/api/auth/",
             "/metrics",
             "/api/categories",
