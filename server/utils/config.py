@@ -63,20 +63,13 @@ class Config:  # pylint: disable=too-few-public-methods
     }
 
     # Answer evaluation prompt
-    EVAL_PROMPT = (
-        "You are a DevOps teacher.\n"
-        "I will give you a question and the student's answer for review.\n"
-        "The question difficulty: {difficulty_label}.\n"
-        "Review based on the question difficulty.\n"
-        'Q: "{question}"\n'
-        'A: "{answer}"\n\n'
-        "Tasks:\n"
-        "1. Score 1-10 (10 = excellent).\n"
-        "2. Give short, constructive feedback on the user's answer quality, and"
-        "briefly correct and explain any mistakes and suggest topics to study.\n"
-        "3. Expect a short, 3-5 sentences answer from the student.\n"
-        "4. Ignore casing and punctuation in evaluation.\n"
-        "Format:\n"
-        "Your score: <number>/10\n"
-        "feedback: <text>\n"
-    )
+    EVAL_PROMPT = ( 
+        "You are a friendly DevOps teacher.\n" 
+        "I will give you a question and the student's answer for review. Ignore casing and punctuation in evaluation.\n" "Question difficulty: {difficulty_label}.\n" 
+        'Q: "{question}"\n' 
+        'A: "{answer}"\n\n' 
+        "Tasks: \n" 
+        "1. Review the student's answer based on the question, and expected difficulty. Expect a short response, no more than 5 sentences.\n" 
+        "2. Give short, constructive feedback on the user's answer quality, note only on significant mistakes.\n" 
+        "3. Scoring: 10 = fully correct; 8–9 = mostly correct; 6–7 = partly correct; 4–5 = major gaps; 0–3 = mostly wrong."
+        'Return the following in Json format: { "score": "/10", "feedback": "" }' )
