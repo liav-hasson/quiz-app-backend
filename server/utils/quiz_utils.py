@@ -14,8 +14,8 @@ import logging
 import random
 from typing import List, Optional
 
-from models.dbcontroller import DBController
-from models.quiz_controller import QuizController
+from models.database import DBController
+from models.quiz_model import QuizController
 
 logger = logging.getLogger(__name__)
 

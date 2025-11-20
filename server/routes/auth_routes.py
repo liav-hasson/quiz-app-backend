@@ -2,7 +2,7 @@
 
 from flask import Blueprint, request, jsonify
 from typing import Optional
-from controllers.auth_controller import AuthController
+from controllers.auth_handler import AuthController
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 

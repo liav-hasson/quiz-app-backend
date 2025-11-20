@@ -1,7 +1,7 @@
 from typing import Dict
 
-from .dbcontroller import DBController
-from .quiz_controller import QuizController
+from .database import DBController
+from .quiz_model import QuizController
 
 
 class DataMigrator:

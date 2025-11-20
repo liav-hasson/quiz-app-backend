@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
-from .dbcontroller import DBController
+from .database import DBController
 
 
 class UserController:

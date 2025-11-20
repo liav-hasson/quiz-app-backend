@@ -22,12 +22,12 @@ from prometheus_flask_exporter import PrometheusMetrics
 from utils.config import Config
 
 # Database models
-from models.dbcontroller import DBController
-from models.user_controller import UserController
-from models.questions_controller import QuestionsController
-from models.topten_controller import TopTenController
-from models.quiz_controller import QuizController
-from models.migrator import DataMigrator
+from models.database import DBController
+from models.user_model import UserController
+from models.questions_model import QuestionsController
+from models.leaderboard_model import TopTenController
+from models.quiz_model import QuizController
+from models.data_migrator import DataMigrator
 
 # Routes
 from routes.health_routes import health_bp, init_health_routes

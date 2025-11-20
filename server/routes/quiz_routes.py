@@ -1,7 +1,7 @@
 """Quiz routes for quiz-related endpoints."""
 
 from flask import Blueprint, request, jsonify
-from controllers.quiz_controller import QuizController
+from controllers.quiz_handler import QuizController
 
 quiz_bp = Blueprint("quiz", __name__, url_prefix="/api")
 
