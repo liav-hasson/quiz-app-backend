@@ -132,8 +132,10 @@ Leaderboard entries (top 10 users by average score).
 ## API Endpoints
 
 ### Authentication
-- **`GET /api/auth/login`** - Start Google OAuth flow
-- **`GET /api/auth/callback`** - OAuth callback (returns JWT token & user)
+- **`POST /api/auth/google-login`** - Verify Google ID token and issue application JWT (recommended)
+  - Input: `{credential: "<Google ID token>"}` 
+  - Output: `{email, name, picture, token}`
+- **`GET /api/auth/callback`** - OAuth redirect callback (returns JWT token & user)
 
 ### Quiz Generation
 - **`GET /api/categories`** - List all quiz categories
