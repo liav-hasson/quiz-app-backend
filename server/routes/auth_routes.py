@@ -16,16 +16,6 @@ def init_auth_routes(oauth_instance, user_controller):
     auth_controller = AuthController(user_controller, oauth_instance)
 
 
-@auth_bp.route("/callback")
-def callback():
-    """Handle Google OAuth callback and create/update user."""
-    if auth_controller is None:
-        return jsonify({"error": "Service not initialized"}), 503
-
-    response_data, status_code = auth_controller.handle_callback()
-    return jsonify(response_data), status_code
-
-
 @auth_bp.route("/google-login", methods=["POST"])
 def google_token_login():
     """Handle Google ID token from frontend and issue application JWT."""

@@ -282,58 +282,6 @@ class UserController:
             user["_id"] = str(user["_id"])
         return user
 
-    def create_or_update_google_user(
-        self,
-        google_id: str,
-        email: str,
-        name: Optional[str] = None,
-        picture: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Create or update a user record coming from Google OAuth.
-
-        Returns the user document (with stringified `_id`).
-        """
-        collection = self._get_collection()
-
-        now = datetime.now()
-
-        # Try to find by google_id first, then by email
-        user = collection.find_one({"google_id": google_id})
-        if not user and email:
-            user = collection.find_one({"email": email})
-
-        if user:
-            # Update existing user
-            update_doc = {
-                "email": email,
-                "name": name,
-                "profile_picture": picture,
-                "google_id": google_id,
-                "updated_at": now,
-            }
-            collection.update_one({"_id": user["_id"]}, {"$set": update_doc})
-            user = collection.find_one({"_id": user["_id"]})
-        else:
-            # Create new user
-            user_doc = {
-                "username": email.split("@")[0] if email else None,
-                "email": email,
-                "name": name,
-                "profile_picture": picture,
-                "google_id": google_id,
-                "experience": 0,
-                "created_at": now,
-                "updated_at": now,
-            }
-            result = collection.insert_one(user_doc)
-            user = collection.find_one({"_id": result.inserted_id})
-
-        if user:
-            user["_id"] = str(user["_id"])
-            return user
-        else:
-            raise Exception("Failed to retrieve created user")
-
 
 class QuizController:
     def __init__(self, db_controller: DBController):

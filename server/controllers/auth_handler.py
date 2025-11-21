@@ -5,63 +5,33 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Tuple
 import jwt
+import pytz
 from google.oauth2 import id_token
 from google.auth.transport import requests
+from utils.config import get_jwt_secret, get_google_client_id
 
 logger = logging.getLogger(__name__)
 
 
 class AuthController:
-    """Controller for authentication operations."""
+    """Controller for authentication operations.
+    
+    This controller implements modern OAuth2 token verification flow for Google authentication.
+    It has been simplified to use only the direct token verification method
+    (handle_google_token_login) which is optimal for single-page applications (SPAs).
+    
+    Removed methods:
+    - handle_callback(): Legacy OAuth Authorization Code Flow endpoint.
+      Was used for traditional redirect-based OAuth but incompatible with modern SPA architecture.
+      Frontend now directly obtains Google ID token via Google JavaScript SDK and sends it to 
+      handle_google_token_login() for verification and app JWT issuance. This is more efficient 
+      (no redirect round-trip) and better suited for SPAs.
+    """
 
     def __init__(self, user_controller, oauth_instance=None):
         """Initialize auth controller with user controller dependency."""
         self.user_controller = user_controller
         self.oauth = oauth_instance
-
-
-    def handle_callback(self) -> Tuple[Dict[str, Any], int]:
-        """
-        Handle OAuth callback request.
-
-        Returns:
-            Tuple of (response_data, status_code)
-        """
-        if self.oauth is None:
-            logger.error("oauth_not_initialized")
-            return {"error": "Service not properly initialized"}, 500
-
-        try:
-            token = self.oauth.google.authorize_access_token()  # type: ignore
-
-            # Try to parse ID token (OIDC) or fetch userinfo
-            try:
-                user_info = self.oauth.google.parse_id_token(token)  # type: ignore
-            except Exception:
-                resp = self.oauth.google.get("userinfo")  # type: ignore
-                user_info = resp.json()
-
-            google_id = user_info.get("sub")
-            email = user_info.get("email")
-            name = user_info.get("name")
-            picture = user_info.get("picture")
-
-            if not google_id or not email:
-                return {"error": "Failed to obtain user info from provider"}, 400
-
-            # Process OAuth callback
-            result = self.process_google_oauth_callback(
-                google_id=google_id, email=email, name=name, picture=picture
-            )
-
-            return result, 200
-
-        except ValueError as e:
-            logger.error("oauth_callback_processing_failed %s", str(e), exc_info=True)
-            return {"error": str(e)}, 500
-        except Exception as e:
-            logger.error("oauth_callback_failed %s", str(e), exc_info=True)
-            return {"error": "OAuth callback failed"}, 500
 
     def handle_google_token_login(
         self, google_id_token: str
@@ -80,13 +50,14 @@ class AuthController:
             Response contains: email, name, picture, token (your JWT)
         """
         try:
-            # Get Google OAuth client ID from environment
-            google_client_id = os.getenv("GOOGLE_CLIENT_ID")
+            # Get Google OAuth client ID from SSM Parameter Store or environment variable
+            google_client_id = get_google_client_id()
             if not google_client_id:
                 logger.error("google_client_id_not_configured")
                 return {"error": "OAuth not properly configured"}, 500
 
-            # Verify the Google ID token
+            # Verify the Google ID token using the google auth library
+            # on success returns a dict with verified claims
             try:
                 idinfo = id_token.verify_oauth2_token(
                     google_id_token, requests.Request(), google_client_id
@@ -113,6 +84,7 @@ class AuthController:
             logger.info("google_token_verified google_id=%s email=%s", google_id, email)
 
             # Create or update user in database
+            # Function defined in "models/user_model.py"
             user = self.user_controller.create_or_update_google_user(
                 google_id=google_id, email=email, name=name, picture=picture
             )
@@ -162,6 +134,7 @@ class AuthController:
 
         try:
             # Create or update user in DB
+            # Function defined in "models/user_model.py"
             user = self.user_controller.create_or_update_google_user(
                 google_id=google_id, email=email, name=name, picture=picture
             )
@@ -194,10 +167,14 @@ class AuthController:
         Returns:
             JWT token string
         """
-        jwt_secret = os.getenv("JWT_SECRET", "devsecret")
+        # secret is in ssm parameter store "/quiz-app/jwt-secret"
+        # function defined in config.py
+        jwt_secret = get_jwt_secret()
         jwt_exp_days = int(os.getenv("JWT_EXP_DAYS", "7"))
 
-        now = datetime.now(timezone.utc)
+        # Use Jerusalem timezone (Asia/Jerusalem)
+        jerusalem_tz = pytz.timezone('Asia/Jerusalem')
+        now = datetime.now(jerusalem_tz)
         payload = {
             "sub": user.get("_id"),
             "email": user.get("email"),
