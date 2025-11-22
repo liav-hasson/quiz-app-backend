@@ -34,7 +34,7 @@ class Settings:
         env = env or os.environ
         return Settings(
             debug=env.get("FLASK_DEBUG", "false").lower() in ("1", "true", "yes"),
-            host=env.get("FLASK_HOST", "0.0.0.0"),
+            host=env.get("FLASK_HOST", "0.0.0.0"),  # nosec B104 - Required for containerized deployment
             port=int(env.get("FLASK_PORT", "5000")),
             jwt_exp_days=int(env.get("JWT_EXP_DAYS", "7")),
             jwt_ssm_parameter_name=env.get("JWT_SSM_PARAMETER", "/quiz-app/jwt-secret"),
