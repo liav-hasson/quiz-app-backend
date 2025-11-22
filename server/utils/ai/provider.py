@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Optional
 
 import boto3
@@ -31,7 +32,9 @@ class OpenAIProvider:
             "fetching_openai_api_key_from_ssm parameter=%s",
             settings.openai_ssm_parameter_name,
         )
-        client = self._ssm_client or boto3.client("ssm")
+        client = self._ssm_client or boto3.client(
+            "ssm", region_name=os.environ.get("AWS_REGION", "eu-north-1")
+        )
         response = client.get_parameter(
             Name=settings.openai_ssm_parameter_name, WithDecryption=True
         )

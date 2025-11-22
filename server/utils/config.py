@@ -83,7 +83,9 @@ def get_jwt_secret(ssm_client=None) -> str:
         "fetching_jwt_secret_from_ssm parameter=%s", settings.jwt_ssm_parameter_name
     )
     try:
-        client = ssm_client or boto3.client("ssm")
+        client = ssm_client or boto3.client(
+            "ssm", region_name=os.environ.get("AWS_REGION", "eu-north-1")
+        )
         resp = client.get_parameter(
             Name=settings.jwt_ssm_parameter_name, WithDecryption=True
         )
@@ -113,7 +115,9 @@ def get_google_client_id(ssm_client=None) -> str:
         settings.google_client_id_parameter,
     )
     try:
-        client = ssm_client or boto3.client("ssm")
+        client = ssm_client or boto3.client(
+            "ssm", region_name=os.environ.get("AWS_REGION", "eu-north-1")
+        )
         resp = client.get_parameter(
             Name=settings.google_client_id_parameter, WithDecryption=True
         )
