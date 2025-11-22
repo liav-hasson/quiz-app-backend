@@ -3,6 +3,8 @@
 from flask import Blueprint, request, jsonify
 from typing import Optional
 from controllers.auth_handler import AuthController
+from models.repositories.user_repository import UserRepository
+from utils.identity import GoogleTokenVerifier, TokenService
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -10,10 +12,18 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 auth_controller: Optional[AuthController] = None
 
 
-def init_auth_routes(oauth_instance, user_controller):
+def init_auth_routes(
+    oauth_instance,
+    user_repository: UserRepository,
+    token_service: TokenService,
+    google_verifier: GoogleTokenVerifier,
+):
     """Initialize auth routes with OAuth and controllers."""
+
     global auth_controller
-    auth_controller = AuthController(user_controller, oauth_instance)
+    auth_controller = AuthController(
+        user_repository, token_service, google_verifier, oauth_instance
+    )
 
 
 @auth_bp.route("/google-login", methods=["POST"])

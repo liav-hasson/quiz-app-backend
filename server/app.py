@@ -12,26 +12,32 @@ import logging
 import os
 import sys
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 from authlib.integrations.flask_client import OAuth
-from flask import Flask, g, request, jsonify
+from flask import Flask, current_app, g, request, jsonify
 from prometheus_flask_exporter import PrometheusMetrics
 
-# Configuration
-from utils.config import Config
+try:  # pragma: no cover - optional dependency (dev/test envs)
+    from prometheus_client import Gauge
+except ImportError:  # pragma: no cover - fallback when library missing
+    Gauge = None  # type: ignore
 
-# Database models
+# Configuration
+from utils.config import settings
+
+# Database and repositories
 from models.database import DBController
-from models.user_model import UserController
-from models.questions_model import QuestionsController
-from models.leaderboard_model import TopTenController
-from models.quiz_model import QuizController
+from models.repositories.user_repository import UserRepository
+from models.repositories.questions_repository import QuestionsRepository
+from models.repositories.leaderboard_repository import LeaderboardRepository
+from models.repositories.quiz_repository import QuizRepository
 from models.data_migrator import DataMigrator
+from utils.identity import TokenService, GoogleTokenVerifier
 
 # Routes
 from routes.health_routes import health_bp, init_health_routes
-from routes.quiz_routes import quiz_bp
+from routes.quiz_routes import quiz_bp, init_quiz_routes
 from routes.auth_routes import auth_bp, init_auth_routes
 from routes.user_activity_routes import user_activity_bp, init_user_activity_routes
 
@@ -41,28 +47,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create Flask app
-app = Flask(__name__)
 
-# Database controllers (initialized by initialize_database())
-db_controller: Optional[DBController] = None
-user_controller: Optional[UserController] = None
-questions_controller: Optional[QuestionsController] = None
-toptens_controller: Optional[TopTenController] = None
-quiz_controller: Optional[QuizController] = None
-oauth = None  # type: ignore  # OAuth instance set by initialize_database()
-
-
-def initialize_database() -> bool:
+def initialize_database(app: Flask) -> bool:
     """Initialize database connection and verify data exists.
+
+    Args:
+        app: Flask application instance to store dependencies.
 
     Returns:
         bool: True if initialization successful, False otherwise.
     """
-    # pylint: disable=global-statement
-    global db_controller, quiz_controller
-    global user_controller, questions_controller, toptens_controller, oauth
-
     try:
         logger.info("Connecting to MongoDB...")
         db_controller = DBController()
@@ -71,11 +65,15 @@ def initialize_database() -> bool:
             logger.error("Failed to connect to MongoDB")
             return False
 
-        # Initialize controllers
-        quiz_controller = QuizController(db_controller)
-        user_controller = UserController(db_controller)
-        questions_controller = QuestionsController(db_controller)
-        toptens_controller = TopTenController(db_controller)
+        # Initialize repositories
+        quiz_repository = QuizRepository(db_controller)
+        user_repository = UserRepository(db_controller)
+        questions_repository = QuestionsRepository(db_controller)
+        leaderboard_repository = LeaderboardRepository(db_controller)
+
+        # Identity helpers
+        token_service = TokenService()
+        google_token_verifier = GoogleTokenVerifier()
 
         # Initialize OAuth
         try:
@@ -96,7 +94,7 @@ def initialize_database() -> bool:
             raise RuntimeError(f"Failed to initialize OAuth: {exc}") from exc
 
         # Check if quiz data exists
-        topics = quiz_controller.get_all_topics()
+        topics = quiz_repository.get_all_topics()
 
         if not topics:
             auto_migrate = os.getenv("AUTO_MIGRATE_DB", "true").lower() == "true"
@@ -106,10 +104,10 @@ def initialize_database() -> bool:
                 json_path = os.path.join(os.path.dirname(__file__), "models", "db.json")
 
                 if os.path.exists(json_path):
-                    migrator = DataMigrator(db_controller, quiz_controller)
+                    migrator = DataMigrator(db_controller, quiz_repository)
                     if migrator.migrate_from_json_file(json_path):
                         logger.info("Data migration successful")
-                        topics = quiz_controller.get_all_topics()
+                        topics = quiz_repository.get_all_topics()
                     else:
                         logger.error("Data migration failed")
                         return False
@@ -120,6 +118,16 @@ def initialize_database() -> bool:
                 logger.error("No quiz data found and AUTO_MIGRATE_DB is disabled")
                 return False
 
+        # Store all dependencies in app.extensions for thread-safe access
+        app.extensions['db_controller'] = db_controller
+        app.extensions['quiz_repository'] = quiz_repository
+        app.extensions['user_repository'] = user_repository
+        app.extensions['questions_repository'] = questions_repository
+        app.extensions['leaderboard_repository'] = leaderboard_repository
+        app.extensions['token_service'] = token_service
+        app.extensions['google_token_verifier'] = google_token_verifier
+        app.extensions['oauth'] = oauth
+
         logger.info("Database initialized successfully. Available topics: %s", topics)
         return True
 
@@ -128,12 +136,34 @@ def initialize_database() -> bool:
         return False
 
 
-def initialize_routes() -> None:
-    """Initialize and register all route blueprints."""
+def initialize_routes(app: Flask) -> None:
+    """Initialize and register all route blueprints.
+    
+    Args:
+        app: Flask application instance containing initialized dependencies.
+    """
+    # Get dependencies from app extensions
+    db_controller = app.extensions['db_controller']
+    quiz_repository = app.extensions['quiz_repository']
+    user_repository = app.extensions['user_repository']
+    questions_repository = app.extensions['questions_repository']
+    leaderboard_repository = app.extensions['leaderboard_repository']
+    token_service = app.extensions['token_service']
+    google_token_verifier = app.extensions['google_token_verifier']
+    oauth = app.extensions['oauth']
+    dependency_metric_setter = app.extensions.get('dependency_metric_setter')
+
     # Initialize route dependencies
-    init_health_routes(db_controller)
-    init_auth_routes(oauth, user_controller)
-    init_user_activity_routes(user_controller, questions_controller, toptens_controller)
+    init_health_routes(
+        db_controller,
+        google_verifier_param=google_token_verifier,
+        dependency_metric_callback_param=dependency_metric_setter,
+    )
+    init_quiz_routes(quiz_repository)
+    init_auth_routes(oauth, user_repository, token_service, google_token_verifier)
+    init_user_activity_routes(
+        user_repository, questions_repository, leaderboard_repository
+    )
 
     # Register blueprints
     app.register_blueprint(health_bp)
@@ -144,85 +174,81 @@ def initialize_routes() -> None:
     logger.info("All routes registered successfully")
 
 
-def setup_middleware() -> None:
-    """Setup Flask middleware and request hooks."""
+def setup_middleware(app: Flask) -> None:
+    """Setup Flask middleware and request hooks.
+    
+    Args:
+        app: Flask application instance containing initialized dependencies.
+    """
 
     @app.before_request
-    def verify_user_email() -> Optional[tuple]:
-        """Verify that the email in the request exists in the database.
+    def authenticate_request() -> Optional[tuple]:
+        """Authenticate requests using JWT Bearer tokens."""
 
-        Returns:
-            Optional[tuple]: Error response if verification fails, None otherwise.
-        """
-        # Skip verification for specific routes
-        exempt_paths = [
+        exempt_paths = (
             "/api/health",
             "/api/auth/",
             "/metrics",
             "/api/categories",
             "/api/subjects",
             "/api/all-subjects",
-        ]
+        )
 
-        # Check if current path should be exempted
+        if current_app.config.get("TESTING"):
+            return None
+
         if any(request.path.startswith(path) for path in exempt_paths):
             return None
 
-        # Extract email from request
-        email = None
+        # Get dependencies from app extensions (thread-safe)
+        user_repository = current_app.extensions.get('user_repository')
+        token_service = current_app.extensions.get('token_service')
 
-        # Try to get email from JSON body
-        if request.is_json:
-            data = request.get_json(silent=True)
-            if data:
-                email = data.get("email") or data.get("user_email")
-
-        # Try to get email from query parameters
-        if not email:
-            email = request.args.get("email") or request.args.get("user_email")
-
-        # Try to get email from headers
-        if not email:
-            email = request.headers.get("X-User-Email") or request.headers.get(
-                "User-Email"
-            )
-
-        # If no email found, return error
-        if not email:
-            logger.warning(
-                "email_missing_in_request path=%s method=%s",
-                request.path,
-                request.method,
-            )
-            return jsonify({"error": "Email is required for this request"}), 400
-
-        # Verify user_controller is initialized
-        if not user_controller:
-            logger.error("user_controller_not_initialized")
+        if not user_repository:
+            logger.error("user_repository_not_initialized")
             return jsonify({"error": "Service not properly initialized"}), 503
 
-        # Verify email exists in database
+        if not token_service:
+            logger.error("token_service_not_initialized")
+            return jsonify({"error": "Authentication unavailable"}), 503
+
+        # Extract JWT from Authorization header
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.lower().startswith("bearer "):
+            logger.warning("missing_bearer_token path=%s", request.path)
+            return jsonify({"error": "Authentication required"}), 401
+
+        bearer_token = auth_header.split(" ", 1)[1].strip()
+
+        # Validate JWT and extract claims
         try:
-            user = user_controller.get_user_by_email(email)
+            claims = token_service.decode(bearer_token)
+            email = claims.get("email")
+            if not email:
+                logger.warning("jwt_missing_email_claim")
+                return jsonify({"error": "Invalid token: missing email claim"}), 401
+        except Exception as exc:  # pragma: no cover - jwt lib raises many types
+            logger.warning("jwt_invalid_token path=%s error=%s", request.path, exc)
+            return jsonify({"error": "Invalid or expired token"}), 401
+
+        try:
+            user = user_repository.get_user_by_email(email)
             if not user:
-                logger.warning(
-                    "email_not_found_in_database email=%s path=%s", email, request.path
-                )
+                logger.warning("user_not_found_for_email email=%s", email)
                 return jsonify({"error": "User not found. Please login first."}), 404
 
-            # Store user in g for use in route handlers
             g.user = user
             g.user_email = email
-            logger.debug("user_verified email=%s user_id=%s", email, user.get("_id"))
-
-        except Exception as e:
+            g.user_claims = claims or {}
+            logger.debug("user_authenticated email=%s user_id=%s", email, user.get("_id"))
+        except Exception as exc:
             logger.error(
-                "email_verification_failed email=%s error=%s",
+                "authentication_failed email=%s error=%s",
                 email,
-                str(e),
+                str(exc),
                 exc_info=True,
             )
-            return jsonify({"error": "Failed to verify user"}), 500
+            return jsonify({"error": "Failed to authenticate user"}), 500
 
         return None
 
@@ -259,10 +285,32 @@ def setup_middleware() -> None:
         return response
 
 
-def setup_metrics() -> None:
-    """Setup Prometheus metrics."""
+def setup_metrics(app: Flask) -> None:
+    """Setup Prometheus metrics and dependency gauges.
+    
+    Args:
+        app: Flask application instance to store metric setter.
+    """
     metrics = PrometheusMetrics(app)
     metrics.info("quiz_app_info", "Quiz Application Info", version="1.0.0")
+
+    if Gauge is not None:
+        dependency_gauge = Gauge(
+            "quiz_dependency_health",
+            "Health status for external dependencies (1=up, 0=down)",
+            ["dependency"],
+        )
+
+        def _set_dependency_metric(dependency: str, healthy: bool) -> None:
+            dependency_gauge.labels(dependency=dependency).set(1 if healthy else 0)
+
+        # Store in app extensions (thread-safe)
+        app.extensions['dependency_metric_setter'] = _set_dependency_metric
+    else:
+        logger.warning(
+            "prometheus_client_missing", extra={"dependency": "prometheus_client"}
+        )
+        app.extensions['dependency_metric_setter'] = None
     logger.info("Prometheus metrics initialized")
 
 
@@ -272,19 +320,22 @@ def create_app() -> Flask:
     Returns:
         Flask: Configured Flask application instance.
     """
-    # Initialize database
-    if not initialize_database():
+    # Create Flask app instance
+    app = Flask(__name__)
+    
+    # Initialize database and store dependencies in app.extensions
+    if not initialize_database(app):
         logger.critical("Cannot start app without database connection")
         sys.exit(1)
 
-    # Setup middleware
-    setup_middleware()
+    # Setup middleware (uses app.extensions)
+    setup_middleware(app)
 
-    # Setup metrics
-    setup_metrics()
+    # Setup metrics (stores in app.extensions)
+    setup_metrics(app)
 
-    # Initialize routes
-    initialize_routes()
+    # Initialize routes (reads from app.extensions)
+    initialize_routes(app)
 
     logger.info("Application created successfully")
     return app
@@ -295,7 +346,7 @@ if __name__ == "__main__":
     application = create_app()
 
     logger.info("=" * 60)
-    logger.info("Starting Flask app on %s:%s", Config.HOST, Config.PORT)
+    logger.info("Starting Flask app on %s:%s", settings.host, settings.port)
     logger.info("=" * 60)
 
-    application.run(debug=Config.DEBUG, host=Config.HOST, port=Config.PORT)
+    application.run(debug=settings.debug, host=settings.host, port=settings.port)

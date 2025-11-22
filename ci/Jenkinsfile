@@ -121,41 +121,34 @@ pipeline {
 
                     echo '--------- Running pylint test ---------'
                     sh '''
-                        # Run pylint on Python source files with proper PYTHONPATH
+                        # Run pylint on all Python source files recursively with proper PYTHONPATH
                         echo "Running pylint on Python source files..."
                         
                         # Set PYTHONPATH to server directory so imports resolve correctly
                         export PYTHONPATH="${WORKSPACE}/server"
                         
-                        # Run pylint on server directory Python files
-                        for pyfile in server/*.py; do
-                            if [ -f "$pyfile" ]; then
-                                echo "Linting: $pyfile"
-                                pylint "$pyfile" --score=yes --fail-under=5.0 --disable=C0103,E0401
-                            fi
-                        done
+                        # Run pylint recursively on entire server directory
+                        pylint server/ --score=yes --fail-under=5.0 --disable=C0103,E0401 --recursive=y || {
+                            echo "Pylint checks failed!"
+                            exit 1
+                        }
                     '''
                     echo 'Pylint checks passed!'
 
                     echo '--------- Running unit tests ---------'
                     sh '''
-                        # Run pytest with proper PYTHONPATH
-                        # Currently running only validation tests (4 tests)
-                        # TODO: Fix remaining tests (test_main.py, test_auth.py, test_quiz_utils.py)
-                        #   - test_main.py: Routes return 404 (app initialization issue)
-                        #   - test_auth.py: OAuth route returns 404
-                        #   - test_quiz_utils.py: Requires MongoDB connection mocking
-                        echo "Running pytest on test suite..."
+                        # Run pytest with proper PYTHONPATH on all test files
+                        echo "Running pytest on complete test suite..."
                         
                         export PYTHONPATH="${WORKSPACE}/server"
                         
                         cd server
-                        pytest tests/test_validation.py --tb=short -v || {
-                            echo "Validation tests failed!"
+                        pytest tests/ --tb=short -v || {
+                            echo "Tests failed!"
                             exit 1
                         }
                         
-                        echo "Validation tests passed (4/16 tests currently enabled)"
+                        echo "All tests passed!"
                     '''
                     echo 'Unit tests completed!'
 
