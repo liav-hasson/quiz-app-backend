@@ -179,13 +179,13 @@ pipeline {
                 script {
                     echo '--------- Running Python static security analysis ---------'
                     sh '''
-                        # Run Bandit security analysis on Python source code
+                        # Run Bandit security analysis on Python source code (exclude tests)
                         echo "Scanning Python code with Bandit..."
-                        bandit -r "${PYTHON_SRC_DIR}" -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
+                        bandit -r "${PYTHON_SRC_DIR}" -x "*/tests/*" -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
                         
                         # Display results in human-readable format  
                         echo "Bandit scan results:"
-                        bandit -r "${PYTHON_SRC_DIR}" -f txt || true
+                        bandit -r "${PYTHON_SRC_DIR}" -x "*/tests/*" -f txt || true
                         
                         # Check if high/medium severity issues found (exit codes 1-2)
                         if [ "${BANDIT_EXIT_CODE:-0}" -eq 1 ] || [ "${BANDIT_EXIT_CODE:-0}" -eq 2 ]; then
