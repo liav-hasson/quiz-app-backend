@@ -3,6 +3,8 @@
 from flask import Blueprint, request, jsonify
 from typing import Optional
 from controllers.auth_handler import AuthController
+from models.repositories.user_repository import UserRepository
+from utils.identity import GoogleTokenVerifier, TokenService
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -10,33 +12,18 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 auth_controller: Optional[AuthController] = None
 
 
-def init_auth_routes(oauth_instance, user_controller):
+def init_auth_routes(
+    oauth_instance,
+    user_repository: UserRepository,
+    token_service: TokenService,
+    google_verifier: GoogleTokenVerifier,
+):
     """Initialize auth routes with OAuth and controllers."""
+
     global auth_controller
-    auth_controller = AuthController(user_controller, oauth_instance)
-
-
-@auth_bp.route("/login", methods=["POST"])
-def login():
-    """Start Google OAuth login flow."""
-    if auth_controller is None:
-        return jsonify({"error": "Service not initialized"}), 503
-    data = request.get_json()
-
-    result, status_code = auth_controller.handle_login(request.url_root, data)
-    if status_code == 200:
-        return result  # Returning data.
-    return jsonify(result), status_code
-
-
-@auth_bp.route("/callback")
-def callback():
-    """Handle Google OAuth callback and create/update user."""
-    if auth_controller is None:
-        return jsonify({"error": "Service not initialized"}), 503
-
-    response_data, status_code = auth_controller.handle_callback()
-    return jsonify(response_data), status_code
+    auth_controller = AuthController(
+        user_repository, token_service, google_verifier, oauth_instance
+    )
 
 
 @auth_bp.route("/google-login", methods=["POST"])

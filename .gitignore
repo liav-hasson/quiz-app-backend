@@ -23,5 +23,20 @@ instance/
 .env
 .env.local
 
-# no lawsuit today
+# Database
+*.db
+*.sqlite
 db.json
+
+# Logs
+*.log
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Distribution
+dist/
+build/
+*.egg-info/

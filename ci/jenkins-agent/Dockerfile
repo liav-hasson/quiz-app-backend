@@ -36,18 +36,12 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages --upgrade --ig
         setuptools==80.9.0 \
         wheel==0.45.1
 
-# Copy and install CI/testing tools from agent_requirements.txt
+# Copy and install all CI/testing and application dependencies from agent_requirements.txt
 COPY ci/jenkins-agent/agent_requirements.txt /tmp/agent_requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages \
         -r /tmp/agent_requirements.txt \
         --ignore-installed packaging && \
     rm /tmp/agent_requirements.txt
-
-# Copy and install application dependencies from src/requirements.txt
-COPY src/requirements.txt /tmp/requirements.txt
-RUN pip3 install --no-cache-dir --break-system-packages \
-        -r /tmp/requirements.txt && \
-    rm /tmp/requirements.txt
 
 # Install Cosign and Hadolint binaries
 RUN curl -O -L "https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64" && \

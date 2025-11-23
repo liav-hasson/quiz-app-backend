@@ -1,82 +1,132 @@
-"""
-Flask application configuration module.
-"""
+"""Runtime configuration helpers for the Quiz backend."""
+
+from __future__ import annotations
+
+import logging
 import os
+from dataclasses import dataclass
+from functools import lru_cache
+from typing import Mapping, Optional
 
-class Config:  # pylint: disable=too-few-public-methods
-    """Flask application configuration."""
+import boto3
 
-    # Flask settings
-    DEBUG = os.environ.get("FLASK_DEBUG", "false").lower() in ("1", "true", "yes")
 
-    # the following comment excludes the line from bandit security testing
-    # avoids failing due to "hardcoded_bind_all_interfaces"
-    HOST = os.environ.get("FLASK_HOST", "0.0.0.0")  # nosec B104 - intentional for containerized app
-    PORT = int(os.environ.get("FLASK_PORT", 5000))
+@dataclass(frozen=True)
+class Settings:
+    """Immutable application configuration loaded from the environment."""
 
-    # OpenAI settings
-    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-    OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-    OPENAI_TEMPERATURE_QUESTION = float(os.environ.get("OPENAI_TEMPERATURE_QUESTION", "0.7"))
-    OPENAI_TEMPERATURE_EVAL = float(os.environ.get("OPENAI_TEMPERATURE_EVAL", "0.5"))
-    OPENAI_MAX_TOKENS_QUESTION = int(os.environ.get("OPENAI_MAX_TOKENS_QUESTION", "200"))
-    OPENAI_MAX_TOKENS_EVAL = int(os.environ.get("OPENAI_MAX_TOKENS_EVAL", "300"))
+    debug: bool
+    host: str
+    port: int
+    jwt_exp_days: int
+    jwt_ssm_parameter_name: str
+    google_client_id_parameter: str
+    openai_api_key: Optional[str]
+    openai_model: str
+    openai_temperature_question: float
+    openai_temperature_eval: float
+    openai_max_tokens_question: int
+    openai_max_tokens_eval: int
+    openai_ssm_parameter_name: str
 
-    # AWS SSM settings (for API key retrieval)
-    SSM_PARAMETER_NAME = os.environ.get(
-        "SSM_PARAMETER_NAME",
-        "/devops-quiz/openai-api-key"
-    )
-
-    # Question generation prompts
-    QUESTION_PROMPT = {
-        1: (
-            "You are a DevOps interviewer, create a {difficulty_label} technical question.\n\n"
-            "Topic: {subcategory} in {category}.\n"
-            "Focus keyword: {keyword}\n"
-            "Question style: {style_modifier}\n\n"
-            "Create a SHORT, CLEAR question that:\n"
-            "- Is appropriate for entry-level DevOps engineers.\n"
-            "- Can be answered in 2-3 sentences.\n\n"
-            "Generate only the question, no additional text."
-        ),
-        2: (
-            "You are a DevOps interviewer, create an {difficulty_label} technical question.\n\n"
-            "Topic: {subcategory} in {category}\n"
-            "Focus keyword: {keyword}\n"
-            "Question style: {style_modifier}\n\n"
-            "Create a SHORT, PRACTICAL question that:\n"
-            "- Is appropriate for mid-level DevOps engineers.\n"
-            "- Can be answered in 3-4 sentences.\n\n"
-            "Generate only the question, no additional text."
-        ),
-        3: (
-            "You are a DevOps interviewer, create an {difficulty_label} level technical question.\n\n"
-            "Topic: {subcategory} in {category}\n"
-            "Focus keyword: {keyword}\n"
-            "Question style: {style_modifier}\n\n"
-            "Create a SHORT, CHALLENGING question that:\n"
-            "- Is appropriate for senior DevOps engineers.\n"
-            "- Can be answered in 4-5 sentences.\n\n"
-            "Generate only the question, no additional text."
+    @staticmethod
+    def from_env(env: Mapping[str, str] | None = None) -> "Settings":
+        env = env or os.environ
+        return Settings(
+            debug=env.get("FLASK_DEBUG", "false").lower() in ("1", "true", "yes"),
+            host=env.get("FLASK_HOST", "0.0.0.0"),  # nosec B104 - Required for containerized deployment
+            port=int(env.get("FLASK_PORT", "5000")),
+            jwt_exp_days=int(env.get("JWT_EXP_DAYS", "7")),
+            jwt_ssm_parameter_name=env.get("JWT_SSM_PARAMETER", "/quiz-app/jwt-secret"),
+            google_client_id_parameter=env.get(
+                "GOOGLE_CLIENT_ID_PARAMETER", "/quiz-app/google-client-id"
+            ),
+            openai_api_key=env.get("OPENAI_API_KEY"),
+            openai_model=env.get("OPENAI_MODEL", "gpt-4o-mini"),
+            openai_temperature_question=float(
+                env.get("OPENAI_TEMPERATURE_QUESTION", "0.7")
+            ),
+            openai_temperature_eval=float(env.get("OPENAI_TEMPERATURE_EVAL", "0.5")),
+            openai_max_tokens_question=int(env.get("OPENAI_MAX_TOKENS_QUESTION", "200")),
+            openai_max_tokens_eval=int(env.get("OPENAI_MAX_TOKENS_EVAL", "300")),
+            openai_ssm_parameter_name=env.get(
+                "OPENAI_SSM_PARAMETER", "/devops-quiz/openai-api-key"
+            ),
         )
-    }
 
-    # Answer evaluation prompt
-    EVAL_PROMPT = (
-        "You are a DevOps teacher.\n"
-        "I will give you a question and the student's answer for review.\n"
-        "The question difficulty: {difficulty_label}.\n"
-        "Review based on the question difficulty.\n"
-        'Q: "{question}"\n'
-        'A: "{answer}"\n\n'
-        "Tasks:\n"
-        "1. Score 1-10 (10 = excellent).\n"
-        "2. Give short, constructive feedback on the user's answer quality, and"
-        "briefly correct and explain any mistakes and suggest topics to study.\n"
-        "3. Expect a short, 3-5 sentences answer from the student.\n"
-        "4. Ignore casing and punctuation in evaluation.\n"
-        "Format:\n"
-        "Your score: <number>/10\n"
-        "feedback: <text>\n"
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Return cached Settings loaded from environment variables."""
+
+    return Settings.from_env()
+
+
+settings = get_settings()
+
+
+def get_jwt_secret(ssm_client=None) -> str:
+    """Fetch JWT secret from environment variable or AWS SSM Parameter Store.
+    
+    Priority:
+    1. JWT_SECRET env var (docker-compose)
+    2. SSM Parameter Store (EKS with IRSA)
+    """
+    logger = logging.getLogger(__name__)
+
+    jwt_secret = os.environ.get("JWT_SECRET")
+    if jwt_secret:
+        logger.debug("using_jwt_secret_from_environment")
+        return jwt_secret
+
+    logger.info(
+        "fetching_jwt_secret_from_ssm parameter=%s", settings.jwt_ssm_parameter_name
     )
+    try:
+        client = ssm_client or boto3.client(
+            "ssm", region_name=os.environ.get("AWS_REGION", "eu-north-1")
+        )
+        resp = client.get_parameter(
+            Name=settings.jwt_ssm_parameter_name, WithDecryption=True
+        )
+        logger.info("jwt_secret_fetched_from_ssm")
+        return resp["Parameter"]["Value"]
+    except Exception as exc:  # pragma: no cover - relies on AWS infra
+        logger.error("jwt_secret_fetch_failed error=%s", str(exc))
+        raise ValueError(f"Failed to retrieve JWT secret: {str(exc)}") from exc
+
+
+def get_google_client_id(ssm_client=None) -> str:
+    """Fetch Google Client ID from environment variable or AWS SSM Parameter Store.
+    
+    Priority:
+    1. GOOGLE_CLIENT_ID env var (docker-compose)
+    2. SSM Parameter Store (EKS with IRSA)
+    """
+    logger = logging.getLogger(__name__)
+
+    google_client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    if google_client_id:
+        logger.debug("using_google_client_id_from_environment")
+        return google_client_id
+
+    logger.info(
+        "fetching_google_client_id_from_ssm parameter=%s",
+        settings.google_client_id_parameter,
+    )
+    try:
+        client = ssm_client or boto3.client(
+            "ssm", region_name=os.environ.get("AWS_REGION", "eu-north-1")
+        )
+        resp = client.get_parameter(
+            Name=settings.google_client_id_parameter, WithDecryption=True
+        )
+        logger.info("google_client_id_fetched_from_ssm")
+        return resp["Parameter"]["Value"]
+    except Exception as exc:  # pragma: no cover
+        logger.error("google_client_id_fetch_failed error=%s", str(exc))
+        raise ValueError(f"Failed to retrieve Google Client ID: {str(exc)}") from exc
+
+
+# Backwards compatibility alias for legacy imports
+Config = settings

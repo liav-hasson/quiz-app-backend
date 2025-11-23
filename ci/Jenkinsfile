@@ -12,7 +12,7 @@ pipeline {
                 spec:
                   containers:
                     - name: jnlp
-                      image: liavvv/jenkins-agent:1.12
+                      image: liavvv/jenkins-agent:1.13
                       imagePullPolicy: Always
                       volumeMounts:
                         - name: workspace-volume
@@ -121,41 +121,34 @@ pipeline {
 
                     echo '--------- Running pylint test ---------'
                     sh '''
-                        # Run pylint on Python source files with proper PYTHONPATH
+                        # Run pylint on all Python source files recursively with proper PYTHONPATH
                         echo "Running pylint on Python source files..."
                         
                         # Set PYTHONPATH to server directory so imports resolve correctly
                         export PYTHONPATH="${WORKSPACE}/server"
                         
-                        # Run pylint on server directory Python files
-                        for pyfile in server/*.py; do
-                            if [ -f "$pyfile" ]; then
-                                echo "Linting: $pyfile"
-                                pylint "$pyfile" --score=yes --fail-under=5.0 --disable=C0103,E0401
-                            fi
-                        done
+                        # Run pylint recursively on entire server directory
+                        pylint server/ --score=yes --fail-under=5.0 --disable=C0103,E0401 --recursive=y || {
+                            echo "Pylint checks failed!"
+                            exit 1
+                        }
                     '''
                     echo 'Pylint checks passed!'
 
                     echo '--------- Running unit tests ---------'
                     sh '''
-                        # Run pytest with proper PYTHONPATH
-                        # Currently running only validation tests (4 tests)
-                        # TODO: Fix remaining tests (test_main.py, test_auth.py, test_quiz_utils.py)
-                        #   - test_main.py: Routes return 404 (app initialization issue)
-                        #   - test_auth.py: OAuth route returns 404
-                        #   - test_quiz_utils.py: Requires MongoDB connection mocking
-                        echo "Running pytest on test suite..."
+                        # Run pytest with proper PYTHONPATH on all test files
+                        echo "Running pytest on complete test suite..."
                         
                         export PYTHONPATH="${WORKSPACE}/server"
                         
                         cd server
-                        pytest tests/test_validation.py --tb=short -v || {
-                            echo "Validation tests failed!"
+                        pytest tests/ --tb=short -v || {
+                            echo "Tests failed!"
                             exit 1
                         }
                         
-                        echo "Validation tests passed (4/16 tests currently enabled)"
+                        echo "All tests passed!"
                     '''
                     echo 'Unit tests completed!'
 
@@ -186,13 +179,13 @@ pipeline {
                 script {
                     echo '--------- Running Python static security analysis ---------'
                     sh '''
-                        # Run Bandit security analysis on Python source code
+                        # Run Bandit security analysis on Python source code (exclude tests)
                         echo "Scanning Python code with Bandit..."
-                        bandit -r "${PYTHON_SRC_DIR}" -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
+                        bandit -r "${PYTHON_SRC_DIR}" -x "*/tests/*" -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
                         
                         # Display results in human-readable format  
                         echo "Bandit scan results:"
-                        bandit -r "${PYTHON_SRC_DIR}" -f txt || true
+                        bandit -r "${PYTHON_SRC_DIR}" -x "*/tests/*" -f txt || true
                         
                         # Check if high/medium severity issues found (exit codes 1-2)
                         if [ "${BANDIT_EXIT_CODE:-0}" -eq 1 ] || [ "${BANDIT_EXIT_CODE:-0}" -eq 2 ]; then

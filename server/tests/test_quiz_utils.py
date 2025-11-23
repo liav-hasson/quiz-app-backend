@@ -1,30 +1,70 @@
-"""Tests for quiz_utils module."""
-from utils.quiz_utils import get_categories, get_subjects, get_random_keyword
+"""Tests for quiz controller module."""
+
+from controllers.quiz_controller import QuizController
+
+
+class DummyQuizRepository:
+    """In-memory quiz data used to drive deterministic controller tests."""
+
+    def __init__(self) -> None:
+        self._data = {
+            "Containers": {
+                "Basics": {
+                    "keywords": ["Docker", "Podman"],
+                    "style_modifiers": ["concept explanation"],
+                },
+                "Advanced": {
+                    "keywords": ["Kubernetes"],
+                    "style_modifiers": ["comparison"],
+                },
+            },
+            "CI/CD": {
+                "Basics": {
+                    "keywords": ["Pipelines"],
+                    "style_modifiers": ["use case scenario"],
+                }
+            },
+        }
+
+    def get_all_topics(self):
+        return list(self._data.keys())
+
+    def get_subtopics_by_topic(self, topic: str):
+        return list(self._data.get(topic, {}).keys())
+
+    def get_keywords_by_topic_subtopic(self, topic: str, subtopic: str):
+        return self._data.get(topic, {}).get(subtopic, {}).get("keywords", [])
+
+    def get_style_modifiers_by_topic_subtopic(self, topic: str, subtopic: str):
+        return self._data.get(topic, {}).get(subtopic, {}).get("style_modifiers", [])
+
+
+_controller = QuizController(DummyQuizRepository())
 
 
 def test_get_categories():
     """Categories should be a non-empty list."""
-    categories = get_categories()
+    categories = _controller.get_categories()
     assert len(categories) > 0
 
 
 def test_get_subjects_valid():
     """Valid category should return subjects."""
-    subjects = get_subjects("Containers")
+    subjects = _controller.get_subjects("Containers")
     assert len(subjects) > 0
 
 
 def test_get_subjects_invalid():
     """Invalid category should return empty list."""
-    assert get_subjects("Invalid") == []
+    assert _controller.get_subjects("Invalid") == []
 
 
 def test_get_random_keyword_valid():
     """Valid category and subject should return a keyword."""
-    keyword = get_random_keyword("Containers", "Basics")
+    keyword = _controller.get_random_keyword("Containers", "Basics")
     assert keyword is not None
 
 
 def test_get_random_keyword_invalid():
     """Invalid inputs should return None."""
-    assert get_random_keyword("Invalid", "Invalid") is None
+    assert _controller.get_random_keyword("Invalid", "Invalid") is None
