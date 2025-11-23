@@ -28,19 +28,30 @@ class Settings:
     openai_max_tokens_question: int
     openai_max_tokens_eval: int
     openai_ssm_parameter_name: str
+    require_authentication: bool
 
     @staticmethod
     def from_env(env: Mapping[str, str] | None = None) -> "Settings":
         env = env or os.environ
         return Settings(
+
+            # toggle Flask debugger (disabled in prod)
             debug=env.get("FLASK_DEBUG", "false").lower() in ("1", "true", "yes"),
+            # the following comment disables bandit error (binding to all interfaces)
             host=env.get("FLASK_HOST", "0.0.0.0"),  # nosec B104 - Required for containerized deployment
             port=int(env.get("FLASK_PORT", "5000")),
+
+            # auth parameters 
             jwt_exp_days=int(env.get("JWT_EXP_DAYS", "7")),
             jwt_ssm_parameter_name=env.get("JWT_SSM_PARAMETER", "/quiz-app/jwt-secret"),
             google_client_id_parameter=env.get(
                 "GOOGLE_CLIENT_ID_PARAMETER", "/quiz-app/google-client-id"
             ),
+            # variable to disable JWT auth in development
+            require_authentication=env.get("REQUIRE_AUTHENTICATION", "true").lower()
+            in ("1", "true", "yes"),
+
+            # ai agent variables
             openai_api_key=env.get("OPENAI_API_KEY"),
             openai_model=env.get("OPENAI_MODEL", "gpt-4o-mini"),
             openai_temperature_question=float(
@@ -51,7 +62,7 @@ class Settings:
             openai_max_tokens_eval=int(env.get("OPENAI_MAX_TOKENS_EVAL", "300")),
             openai_ssm_parameter_name=env.get(
                 "OPENAI_SSM_PARAMETER", "/devops-quiz/openai-api-key"
-            ),
+            ),            
         )
 
 
@@ -83,9 +94,7 @@ def get_jwt_secret(ssm_client=None) -> str:
         "fetching_jwt_secret_from_ssm parameter=%s", settings.jwt_ssm_parameter_name
     )
     try:
-        client = ssm_client or boto3.client(
-            "ssm", region_name=os.environ.get("AWS_REGION", "eu-north-1")
-        )
+        client = ssm_client or boto3.client("ssm")
         resp = client.get_parameter(
             Name=settings.jwt_ssm_parameter_name, WithDecryption=True
         )
@@ -115,9 +124,7 @@ def get_google_client_id(ssm_client=None) -> str:
         settings.google_client_id_parameter,
     )
     try:
-        client = ssm_client or boto3.client(
-            "ssm", region_name=os.environ.get("AWS_REGION", "eu-north-1")
-        )
+        client = ssm_client or boto3.client("ssm")
         resp = client.get_parameter(
             Name=settings.google_client_id_parameter, WithDecryption=True
         )

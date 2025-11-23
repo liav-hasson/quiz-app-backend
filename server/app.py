@@ -197,6 +197,9 @@ def setup_middleware(app: Flask) -> None:
         if current_app.config.get("TESTING"):
             return None
 
+        if not current_app.config.get("REQUIRE_AUTHENTICATION", True):
+            return None
+
         if any(request.path.startswith(path) for path in exempt_paths):
             return None
 
@@ -322,6 +325,7 @@ def create_app() -> Flask:
     """
     # Create Flask app instance
     app = Flask(__name__)
+    app.config["REQUIRE_AUTHENTICATION"] = settings.require_authentication
     
     # Initialize database and store dependencies in app.extensions
     if not initialize_database(app):
