@@ -132,3 +132,80 @@ def update_leaderboard():
     except Exception as e:
         logger.error("leaderboard_update_failed error=%s", str(e), exc_info=True)
         return jsonify({"error": f"Failed to update leaderboard: {str(e)}"}), 500
+
+
+@user_activity_bp.route("/best-category", methods=["GET"])
+def get_best_category():
+    """Get user's best performing category."""
+    if activity_controller is None:
+        return jsonify({"error": "Service not initialized"}), 503
+
+    authenticated_user = getattr(g, "user", None)
+    if not authenticated_user and not current_app.config.get("TESTING"):
+        return jsonify({"error": "Authentication required"}), 401
+
+    try:
+        result = activity_controller.get_best_category(
+            authenticated_user=authenticated_user
+        )
+        return jsonify(result), 200
+    except ValueError as exc:
+        logger.warning("best_category_fetch_failed error=%s", str(exc))
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("best_category_failed error=%s", str(exc), exc_info=True)
+        return jsonify({"error": "Failed to fetch best category"}), 500
+
+
+@user_activity_bp.route("/performance", methods=["GET"])
+def get_performance():
+    """Get time-series performance data for charting."""
+    if activity_controller is None:
+        return jsonify({"error": "Service not initialized"}), 503
+
+    authenticated_user = getattr(g, "user", None)
+    if not authenticated_user and not current_app.config.get("TESTING"):
+        return jsonify({"error": "Authentication required"}), 401
+
+    try:
+        period = request.args.get("period", "30d")
+        granularity = request.args.get("granularity", "day")
+        
+        # Validate parameters
+        if period not in ["7d", "30d", "all"]:
+            return jsonify({"error": "Invalid period. Must be 7d, 30d, or all"}), 400
+        if granularity not in ["day", "week"]:
+            return jsonify({"error": "Invalid granularity. Must be day or week"}), 400
+        
+        result = activity_controller.get_performance_timeseries(
+            authenticated_user=authenticated_user,
+            period=period,
+            granularity=granularity
+        )
+        return jsonify(result), 200
+    except ValueError as exc:
+        logger.warning("performance_fetch_failed error=%s", str(exc))
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("performance_failed error=%s", str(exc), exc_info=True)
+        return jsonify({"error": "Failed to fetch performance data"}), 500
+
+
+@user_activity_bp.route("/leaderboard/enhanced", methods=["GET"])
+def get_enhanced_leaderboard():
+    """Get enhanced leaderboard with current user's rank."""
+    if activity_controller is None:
+        return jsonify({"error": "Service not initialized"}), 503
+
+    authenticated_user = getattr(g, "user", None)
+    # This endpoint works for both authenticated and anonymous users
+    # but provides enhanced data for authenticated users
+
+    try:
+        result = activity_controller.get_enhanced_leaderboard(
+            authenticated_user=authenticated_user
+        )
+        return jsonify(result), 200
+    except Exception as exc:
+        logger.error("enhanced_leaderboard_failed error=%s", str(exc), exc_info=True)
+        return jsonify({"error": "Failed to fetch enhanced leaderboard"}), 500

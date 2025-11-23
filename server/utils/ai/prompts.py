@@ -2,33 +2,33 @@
 
 QUESTION_PROMPTS = {
     1: (
-        "You are a DevOps interviewer, create a {difficulty_label} technical question.\n\n"
+        "You are a DevOps interviewer, create an easy technical question.\n\n"
         "Topic: {subcategory} in {category}.\n"
         "Focus keyword: {keyword}\n"
         "Question style: {style_modifier}\n\n"
         "Create a SHORT, CLEAR question that:\n"
-        "- Is appropriate for entry-level DevOps engineers.\n"
+        "- Is appropriate for beginner DevOps student.\n"
         "- Can be answered in 2-3 sentences.\n\n"
         "Generate only the question, no additional text."
     ),
     2: (
-        "You are a DevOps interviewer, create an {difficulty_label} technical question.\n\n"
+        "You are a DevOps interviewer, create a medium technical question.\n\n"
         "Topic: {subcategory} in {category}\n"
         "Focus keyword: {keyword}\n"
         "Question style: {style_modifier}\n\n"
         "Create a SHORT, PRACTICAL question that:\n"
-        "- Is appropriate for mid-level DevOps engineers.\n"
+        "- Is appropriate for entry-level DevOps engineers.\n"
         "- Can be answered in 3-4 sentences.\n\n"
         "Generate only the question, no additional text."
     ),
     3: (
-        "You are a DevOps interviewer, create an {difficulty_label} level technical question.\n\n"
+        "You are a DevOps interviewer, create an hard level technical question.\n\n"
         "Topic: {subcategory} in {category}\n"
         "Focus keyword: {keyword}\n"
         "Question style: {style_modifier}\n\n"
         "Create a SHORT, CHALLENGING question that:\n"
         "- Is appropriate for senior DevOps engineers.\n"
-        "- Can be answered in 4-5 sentences.\n\n"
+        "- Can be answered in 3-4 sentences.\n\n"
         "Generate only the question, no additional text."
     ),
 }
