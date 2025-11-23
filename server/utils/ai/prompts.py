@@ -2,7 +2,7 @@
 
 QUESTION_PROMPTS = {
     1: (
-        "You are a DevOps interviewer, create an easy technical question.\n\n"
+        "You are a DevOps interviewer, create an very easy technical question.\n\n"
         "Topic: {subcategory} in {category}.\n"
         "Focus keyword: {keyword}\n"
         "Question style: {style_modifier}\n\n"

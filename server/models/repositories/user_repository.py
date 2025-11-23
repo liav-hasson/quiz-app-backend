@@ -99,27 +99,29 @@ class UserRepository(BaseRepository):
         return self.collection.find_one({"username": username}) is not None
 
     def get_leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get top users by weighted average score (experience / questions_count).
+        """Get top users by total experience (weighted XP).
+        
+        Rankings are based on total XP earned. Average score is shown as a secondary stat.
         
         Args:
             limit: Number of top users to return (default 10)
             
         Returns:
-            List of users with rank, username, avg_score, total_score, attempts
+            List of users with rank, username, total_score, avg_score, attempts
         """
         import math
         
         pipeline = [
             # Only include users who have answered questions
             {"$match": {"questions_count": {"$gt": 0}}},
-            # Calculate weighted average score
+            # Calculate average score as secondary stat
             {"$addFields": {
                 "avg_score": {
                     "$divide": ["$experience", "$questions_count"]
                 }
             }},
-            # Sort by average score descending
-            {"$sort": {"avg_score": -1}},
+            # Sort by total experience (XP) descending
+            {"$sort": {"experience": -1}},
             # Limit to top N
             {"$limit": limit},
             # Project fields we want to return
@@ -128,8 +130,8 @@ class UserRepository(BaseRepository):
                 "username": 1,
                 "email": 1,
                 "name": 1,
-                "avg_score": {"$ceil": "$avg_score"},  # Round up as per requirements
                 "total_score": "$experience",
+                "avg_score": {"$ceil": "$avg_score"},  # Round up as secondary stat
                 "attempts": "$questions_count"
             }}
         ]
@@ -143,10 +145,12 @@ class UserRepository(BaseRepository):
         return users
 
     def get_user_rank(self, username: str) -> Optional[Dict[str, Any]]:
-        """Get a specific user's rank and stats.
+        """Get a specific user's rank and stats based on total XP.
+        
+        Rankings are based on total experience (weighted XP), not average score.
         
         Returns:
-            Dict with rank, username, avg_score, total_score, attempts, percentile
+            Dict with rank, username, total_score, avg_score, attempts, percentile
             or None if user not found or has no attempts
         """
         import math
@@ -159,16 +163,11 @@ class UserRepository(BaseRepository):
         count = user.get("questions_count", 0)
         avg_score = math.ceil(exp / count) if count > 0 else 0
         
-        # Count how many users have a higher average score
-        pipeline = [
-            {"$match": {"questions_count": {"$gt": 0}}},
-            {"$addFields": {
-                "avg_score": {"$divide": ["$experience", "$questions_count"]}
-            }},
-            {"$match": {"avg_score": {"$gt": exp / count if count > 0 else 0}}}
-        ]
-        
-        higher_count = len(list(self.collection.aggregate(pipeline)))
+        # Count how many users have higher total XP
+        higher_count = self.collection.count_documents({
+            "questions_count": {"$gt": 0},
+            "experience": {"$gt": exp}
+        })
         rank = higher_count + 1
         
         # Get total users with attempts for percentile
