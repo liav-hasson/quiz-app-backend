@@ -130,8 +130,25 @@ class AIQuestionService:
         if hasattr(response, "usage") and response.usage is not None:
             tokens_used = response.usage.total_tokens
 
+        # Strip markdown code blocks if present (```json ... ```)
+        cleaned_content = content.strip()
+        if cleaned_content.startswith("```json"):
+            cleaned_content = cleaned_content[7:]  # Remove ```json
+        elif cleaned_content.startswith("```"):
+            cleaned_content = cleaned_content[3:]  # Remove ```
+        if cleaned_content.endswith("```"):
+            cleaned_content = cleaned_content[:-3]  # Remove trailing ```
+        cleaned_content = cleaned_content.strip()
+        
         try:
-            evaluation = json.loads(content)
+            evaluation = json.loads(cleaned_content)
+            
+            # Validate the response has required fields
+            if not isinstance(evaluation, dict):
+                raise ValueError("AI response is not a JSON object")
+            if "score" not in evaluation or "feedback" not in evaluation:
+                raise ValueError("AI response missing required fields (score/feedback)")
+            
             logger.info(
                 "openai_evaluate_answer_success difficulty=%d tokens_used=%d score=%s",
                 difficulty,
@@ -142,10 +159,12 @@ class AIQuestionService:
                 "score": evaluation.get("score", "N/A"),
                 "feedback": evaluation.get("feedback", "No feedback provided"),
             }
-        except json.JSONDecodeError as exc:
-            logger.warning(
-                "ai_response_not_json difficulty=%d error=%s treating as plain text",
+        except (json.JSONDecodeError, ValueError) as exc:
+            logger.error(
+                "ai_response_invalid difficulty=%d error=%s content=%s",
                 difficulty,
                 str(exc),
+                content[:200],  # Log first 200 chars for debugging
             )
-            return {"score": "N/A", "feedback": content.strip()}
+            # Raise the error so it can be handled at the route level
+            raise ValueError(f"AI evaluation failed: Invalid response format - {str(exc)}") from exc

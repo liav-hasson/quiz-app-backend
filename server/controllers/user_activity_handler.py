@@ -195,11 +195,11 @@ class UserActivityController:
         
         return result
 
-    def get_enhanced_leaderboard(
+    def get_leaderboard_with_user_rank(
         self,
         authenticated_user: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Get enhanced leaderboard with current user's rank.
+        """Get leaderboard with top 10 users and current user's rank.
         
         Returns:
             {
@@ -207,57 +207,40 @@ class UserActivityController:
                 "current_user": {
                     "rank": int,
                     "username": str,
-                    "avg_score": float,
+                    "avg_score": int,
                     "total_score": int,
                     "attempts": int,
                     "percentile": float
-                },
+                } | None,
                 "total_users": int
             }
         """
-        logger.info("fetching_enhanced_leaderboard")
+        logger.info("fetching_leaderboard")
         
-        # Get top 10
-        top_ten = self.leaderboard_repository.get_top_ten()
-        total_users = self.leaderboard_repository.get_total_ranked_users()
+        # Get top 10 users from users collection
+        leaderboard = self.user_repository.get_leaderboard(limit=10)
         
-        # Get current user's stats if authenticated
+        # Get total users with attempts
+        total_users = self.user_repository.collection.count_documents({"questions_count": {"$gt": 0}})
+        
+        # Get current user's rank if authenticated
         current_user_data = None
         if authenticated_user:
-            user = authenticated_user
-            username = user.get("username") or user.get("email")
+            username = authenticated_user.get("username") or authenticated_user.get("email")
+            current_user_data = self.user_repository.get_user_rank(username)
             
-            # Get user's score from leaderboard or calculate
-            exp = user.get("experience", 0)
-            count = user.get("questions_count", 0)
-            avg_score = exp / count if count > 0 else 0
-            
-            # Get rank
-            rank = self.leaderboard_repository.get_user_rank(username, avg_score)
-            
-            # Calculate percentile
-            percentile = ((total_users - rank) / total_users * 100) if total_users > 0 else 0
-            
-            current_user_data = {
-                "rank": rank,
-                "username": username,
-                "avg_score": round(avg_score, 2),
-                "total_score": exp,
-                "attempts": count,
-                "percentile": round(percentile, 1)
-            }
-            
-            logger.info(
-                "current_user_rank username=%s rank=%d percentile=%.1f",
-                username,
-                rank,
-                percentile
-            )
+            if current_user_data:
+                logger.info(
+                    "current_user_rank username=%s rank=%d percentile=%.1f",
+                    username,
+                    current_user_data["rank"],
+                    current_user_data["percentile"]
+                )
         
-        logger.info("enhanced_leaderboard_fetched top_ten=%d total_users=%d", len(top_ten), total_users)
+        logger.info("leaderboard_fetched top_users=%d total_users=%d", len(leaderboard), total_users)
         
         return {
-            "leaderboard": top_ten,
+            "leaderboard": leaderboard,
             "current_user": current_user_data,
             "total_users": total_users
         }

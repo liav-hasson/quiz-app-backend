@@ -98,6 +98,92 @@ class UserRepository(BaseRepository):
     def username_exists(self, username: str) -> bool:
         return self.collection.find_one({"username": username}) is not None
 
+    def get_leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get top users by weighted average score (experience / questions_count).
+        
+        Args:
+            limit: Number of top users to return (default 10)
+            
+        Returns:
+            List of users with rank, username, avg_score, total_score, attempts
+        """
+        import math
+        
+        pipeline = [
+            # Only include users who have answered questions
+            {"$match": {"questions_count": {"$gt": 0}}},
+            # Calculate weighted average score
+            {"$addFields": {
+                "avg_score": {
+                    "$divide": ["$experience", "$questions_count"]
+                }
+            }},
+            # Sort by average score descending
+            {"$sort": {"avg_score": -1}},
+            # Limit to top N
+            {"$limit": limit},
+            # Project fields we want to return
+            {"$project": {
+                "_id": {"$toString": "$_id"},
+                "username": 1,
+                "email": 1,
+                "name": 1,
+                "avg_score": {"$ceil": "$avg_score"},  # Round up as per requirements
+                "total_score": "$experience",
+                "attempts": "$questions_count"
+            }}
+        ]
+        
+        users = list(self.collection.aggregate(pipeline))
+        
+        # Add rank positions
+        for idx, user in enumerate(users):
+            user["rank"] = idx + 1
+        
+        return users
+
+    def get_user_rank(self, username: str) -> Optional[Dict[str, Any]]:
+        """Get a specific user's rank and stats.
+        
+        Returns:
+            Dict with rank, username, avg_score, total_score, attempts, percentile
+            or None if user not found or has no attempts
+        """
+        import math
+        
+        user = self.get_user_by_username(username)
+        if not user or user.get("questions_count", 0) == 0:
+            return None
+        
+        exp = user.get("experience", 0)
+        count = user.get("questions_count", 0)
+        avg_score = math.ceil(exp / count) if count > 0 else 0
+        
+        # Count how many users have a higher average score
+        pipeline = [
+            {"$match": {"questions_count": {"$gt": 0}}},
+            {"$addFields": {
+                "avg_score": {"$divide": ["$experience", "$questions_count"]}
+            }},
+            {"$match": {"avg_score": {"$gt": exp / count if count > 0 else 0}}}
+        ]
+        
+        higher_count = len(list(self.collection.aggregate(pipeline)))
+        rank = higher_count + 1
+        
+        # Get total users with attempts for percentile
+        total_users = self.collection.count_documents({"questions_count": {"$gt": 0}})
+        percentile = ((total_users - rank) / total_users * 100) if total_users > 0 else 0
+        
+        return {
+            "rank": rank,
+            "username": user.get("username") or user.get("email"),
+            "avg_score": avg_score,
+            "total_score": exp,
+            "attempts": count,
+            "percentile": round(percentile, 1)
+        }
+
     # OAuth helpers
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         # Basic email validation
