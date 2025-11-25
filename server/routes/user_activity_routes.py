@@ -29,12 +29,17 @@ def init_user_activity_routes(
     user_repository: UserRepository,
     questions_repository: QuestionsRepository,
     leaderboard_repository: LeaderboardRepository,
-):
-    """Initialize user activity routes with controllers."""
+) -> UserActivityController:
+    """Initialize user activity routes with controllers.
+
+    Returns:
+        UserActivityController: The initialized controller instance.
+    """
     global activity_controller
     activity_controller = UserActivityController(
         user_repository, questions_repository, leaderboard_repository
     )
+    return activity_controller
 
 
 @user_activity_bp.route("/answers", methods=["POST"])

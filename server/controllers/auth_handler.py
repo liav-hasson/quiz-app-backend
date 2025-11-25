@@ -16,16 +16,18 @@ logger = logging.getLogger(__name__)
 
 class AuthController:
     """Controller for authentication operations.
-    
+
     Implements OAuth2 token verification flow for Google authentication.
     Frontend obtains Google ID token via Google JavaScript SDK and sends it to
     handle_google_token_login() for verification and app JWT issuance.
     """
+
     def __init__(
         self,
         user_repository,
         token_service: TokenService,
         google_verifier: GoogleTokenVerifier,
+        user_activity_controller=None,
         oauth_instance=None,
     ):
         """Initialize auth controller with injected services."""
@@ -33,6 +35,7 @@ class AuthController:
         self.user_repository = user_repository
         self.token_service = token_service
         self.google_verifier = google_verifier
+        self.user_activity_controller = user_activity_controller
         self.oauth = oauth_instance
 
     def handle_google_token_login(
@@ -84,11 +87,28 @@ class AuthController:
                 google_id=google_id, email=email, name=name, picture=picture
             )
 
+            # Check and reset streak if user hasn't been active
+            if self.user_activity_controller:
+                streak_result = (
+                    self.user_activity_controller.check_and_reset_streak_on_login(user)
+                )
+                if streak_result["was_reset"]:
+                    logger.info(
+                        "streak_reset_on_login user_id=%s days_since=%d",
+                        user.get("_id"),
+                        streak_result["days_since_last_activity"],
+                    )
+                    # Update user object with new streak
+                    user["streak"] = 0
+
             # Generate your application's JWT token
             app_token = self.token_service.generate(user)
 
             logger.info(
-                "token_login_successful user_id=%s email=%s", user.get("_id"), email
+                "token_login_successful user_id=%s email=%s streak=%d",
+                user.get("_id"),
+                email,
+                user.get("streak", 0),
             )
 
             # Return the response in your desired format
@@ -97,6 +117,7 @@ class AuthController:
                 "name": name,
                 "picture": picture,
                 "token": app_token,
+                "streak": user.get("streak", 0),
             }, 200
 
         except Exception as e:
