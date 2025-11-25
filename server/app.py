@@ -119,14 +119,14 @@ def initialize_database(app: Flask) -> bool:
                 return False
 
         # Store all dependencies in app.extensions for thread-safe access
-        app.extensions['db_controller'] = db_controller
-        app.extensions['quiz_repository'] = quiz_repository
-        app.extensions['user_repository'] = user_repository
-        app.extensions['questions_repository'] = questions_repository
-        app.extensions['leaderboard_repository'] = leaderboard_repository
-        app.extensions['token_service'] = token_service
-        app.extensions['google_token_verifier'] = google_token_verifier
-        app.extensions['oauth'] = oauth
+        app.extensions["db_controller"] = db_controller
+        app.extensions["quiz_repository"] = quiz_repository
+        app.extensions["user_repository"] = user_repository
+        app.extensions["questions_repository"] = questions_repository
+        app.extensions["leaderboard_repository"] = leaderboard_repository
+        app.extensions["token_service"] = token_service
+        app.extensions["google_token_verifier"] = google_token_verifier
+        app.extensions["oauth"] = oauth
 
         logger.info("Database initialized successfully. Available topics: %s", topics)
         return True
@@ -138,20 +138,20 @@ def initialize_database(app: Flask) -> bool:
 
 def initialize_routes(app: Flask) -> None:
     """Initialize and register all route blueprints.
-    
+
     Args:
         app: Flask application instance containing initialized dependencies.
     """
     # Get dependencies from app extensions
-    db_controller = app.extensions['db_controller']
-    quiz_repository = app.extensions['quiz_repository']
-    user_repository = app.extensions['user_repository']
-    questions_repository = app.extensions['questions_repository']
-    leaderboard_repository = app.extensions['leaderboard_repository']
-    token_service = app.extensions['token_service']
-    google_token_verifier = app.extensions['google_token_verifier']
-    oauth = app.extensions['oauth']
-    dependency_metric_setter = app.extensions.get('dependency_metric_setter')
+    db_controller = app.extensions["db_controller"]
+    quiz_repository = app.extensions["quiz_repository"]
+    user_repository = app.extensions["user_repository"]
+    questions_repository = app.extensions["questions_repository"]
+    leaderboard_repository = app.extensions["leaderboard_repository"]
+    token_service = app.extensions["token_service"]
+    google_token_verifier = app.extensions["google_token_verifier"]
+    oauth = app.extensions["oauth"]
+    dependency_metric_setter = app.extensions.get("dependency_metric_setter")
 
     # Initialize route dependencies
     init_health_routes(
@@ -160,9 +160,19 @@ def initialize_routes(app: Flask) -> None:
         dependency_metric_callback_param=dependency_metric_setter,
     )
     init_quiz_routes(quiz_repository)
-    init_auth_routes(oauth, user_repository, token_service, google_token_verifier)
-    init_user_activity_routes(
+
+    # Initialize user activity routes first to get the controller
+    user_activity_controller = init_user_activity_routes(
         user_repository, questions_repository, leaderboard_repository
+    )
+
+    # Pass user_activity_controller to auth routes for streak checking on login
+    init_auth_routes(
+        oauth,
+        user_repository,
+        token_service,
+        google_token_verifier,
+        user_activity_controller,
     )
 
     # Register blueprints
@@ -176,7 +186,7 @@ def initialize_routes(app: Flask) -> None:
 
 def setup_middleware(app: Flask) -> None:
     """Setup Flask middleware and request hooks.
-    
+
     Args:
         app: Flask application instance containing initialized dependencies.
     """
@@ -204,8 +214,8 @@ def setup_middleware(app: Flask) -> None:
             return None
 
         # Get dependencies from app extensions (thread-safe)
-        user_repository = current_app.extensions.get('user_repository')
-        token_service = current_app.extensions.get('token_service')
+        user_repository = current_app.extensions.get("user_repository")
+        token_service = current_app.extensions.get("token_service")
 
         if not user_repository:
             logger.error("user_repository_not_initialized")
@@ -243,7 +253,9 @@ def setup_middleware(app: Flask) -> None:
             g.user = user
             g.user_email = email
             g.user_claims = claims or {}
-            logger.debug("user_authenticated email=%s user_id=%s", email, user.get("_id"))
+            logger.debug(
+                "user_authenticated email=%s user_id=%s", email, user.get("_id")
+            )
         except Exception as exc:
             logger.error(
                 "authentication_failed email=%s error=%s",
@@ -290,7 +302,7 @@ def setup_middleware(app: Flask) -> None:
 
 def setup_metrics(app: Flask) -> None:
     """Setup Prometheus metrics and dependency gauges.
-    
+
     Args:
         app: Flask application instance to store metric setter.
     """
@@ -308,12 +320,12 @@ def setup_metrics(app: Flask) -> None:
             dependency_gauge.labels(dependency=dependency).set(1 if healthy else 0)
 
         # Store in app extensions (thread-safe)
-        app.extensions['dependency_metric_setter'] = _set_dependency_metric
+        app.extensions["dependency_metric_setter"] = _set_dependency_metric
     else:
         logger.warning(
             "prometheus_client_missing", extra={"dependency": "prometheus_client"}
         )
-        app.extensions['dependency_metric_setter'] = None
+        app.extensions["dependency_metric_setter"] = None
     logger.info("Prometheus metrics initialized")
 
 
@@ -326,7 +338,7 @@ def create_app() -> Flask:
     # Create Flask app instance
     app = Flask(__name__)
     app.config["REQUIRE_AUTHENTICATION"] = settings.require_authentication
-    
+
     # Initialize database and store dependencies in app.extensions
     if not initialize_database(app):
         logger.critical("Cannot start app without database connection")

@@ -13,9 +13,7 @@ logger = logging.getLogger(__name__)
 class UserActivityController:
     """Controller for user activity tracking (answers, leaderboard)."""
 
-    def __init__(
-        self, user_repository, questions_repository, leaderboard_repository
-    ):
+    def __init__(self, user_repository, questions_repository, leaderboard_repository):
         """Initialize with repository dependencies."""
         self.user_repository = user_repository
         self.questions_repository = questions_repository
@@ -76,11 +74,22 @@ class UserActivityController:
             user.get("username", user.get("email", "")), score or 0
         )
 
+        # Update user's streak
+        streak_result = self.update_streak(user)
         logger.info(
-            "answer_saved answer_id=%s user_id=%s score=%s",
+            "streak_updated user_id=%s streak=%d is_new_day=%s reset=%s",
+            user.get("_id"),
+            streak_result["streak"],
+            streak_result["is_new_day"],
+            streak_result["reset"],
+        )
+
+        logger.info(
+            "answer_saved answer_id=%s user_id=%s score=%s streak=%d",
             answer_id,
             user.get("_id"),
             score,
+            streak_result["streak"],
         )
 
         return answer_id
@@ -159,7 +168,7 @@ class UserActivityController:
         for entry in raw_entries:
             extra = entry.get("extra", {}) or {}
             created_at = entry.get("created_at")
-            
+
             # Properly handle datetime conversion
             if isinstance(created_at, datetime):
                 created_iso = created_at.isoformat()
@@ -167,7 +176,7 @@ class UserActivityController:
                 created_iso = created_at
             else:
                 created_iso = datetime.now().isoformat()
-            
+
             history.append(
                 {
                     "id": entry.get("_id"),
@@ -220,7 +229,9 @@ class UserActivityController:
         raise ValueError("Unable to resolve user context for answer recording")
 
     @staticmethod
-    def _normalize_score(score_value: Any, evaluation: Optional[Dict[str, Any]]) -> Optional[int]:
+    def _normalize_score(
+        score_value: Any, evaluation: Optional[Dict[str, Any]]
+    ) -> Optional[int]:
         if isinstance(score_value, (int, float)):
             return int(score_value)
 
@@ -239,3 +250,162 @@ class UserActivityController:
                     return int(match.group(1))
 
         return None
+
+    def update_streak(
+        self,
+        user: Dict[str, Any],
+        activity_date: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Update user's streak based on activity.
+
+        Checks if the user has been active today and updates their streak accordingly.
+        If midnight has passed since last activity, streak resets to 0.
+
+        Args:
+            user: User dictionary with _id, streak, and last_activity_date
+            activity_date: Date of activity (defaults to now)
+
+        Returns:
+            Dictionary with streak status: {"streak": int, "is_new_day": bool, "reset": bool}
+        """
+        if activity_date is None:
+            activity_date = datetime.now()
+
+        current_streak = user.get("streak", 0)
+        last_activity = user.get("last_activity_date")
+
+        activity_day = activity_date.date()
+
+        if last_activity is None:
+            new_streak = 1
+            self.user_repository.update_streak(user["_id"], new_streak, activity_date)
+            logger.info(
+                "streak_started user_id=%s streak=%d",
+                user.get("_id"),
+                new_streak,
+            )
+            return {"streak": new_streak, "is_new_day": True, "reset": False}
+
+        if isinstance(last_activity, datetime):
+            last_activity_day = last_activity.date()
+        elif isinstance(last_activity, str):
+            last_activity_day = datetime.fromisoformat(last_activity).date()
+        else:
+            last_activity_day = activity_day
+
+        day_diff = (activity_day - last_activity_day).days
+
+        if day_diff == 0:
+            # Same day - no streak change
+            logger.debug(
+                "streak_same_day user_id=%s streak=%d",
+                user.get("_id"),
+                current_streak,
+            )
+            return {"streak": current_streak, "is_new_day": False, "reset": False}
+
+        elif day_diff == 1:
+            # Consecutive day - increment streak
+            new_streak = current_streak + 1
+            self.user_repository.update_streak(user["_id"], new_streak, activity_date)
+            logger.info(
+                "streak_incremented user_id=%s old_streak=%d new_streak=%d",
+                user.get("_id"),
+                current_streak,
+                new_streak,
+            )
+            return {"streak": new_streak, "is_new_day": True, "reset": False}
+
+        else:
+            # Missed a day (or more) - reset streak to 1
+            new_streak = 1
+            self.user_repository.update_streak(user["_id"], new_streak, activity_date)
+            logger.info(
+                "streak_reset user_id=%s old_streak=%d days_missed=%d",
+                user.get("_id"),
+                current_streak,
+                day_diff - 1,
+            )
+            return {"streak": new_streak, "is_new_day": True, "reset": True}
+
+    def check_and_reset_streak_on_login(
+        self,
+        user: Dict[str, Any],
+        login_date: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Check if user's streak needs to be reset on login.
+
+        If user didn't answer a question yesterday (gap of more than 1 day),
+        reset their streak to 0.
+
+        Args:
+            user: User dictionary with _id, streak, and last_activity_date
+            login_date: Date of login (defaults to now)
+
+        Returns:
+            Dictionary with: {"streak": int, "was_reset": bool, "days_since_last_activity": int}
+        """
+        if login_date is None:
+            login_date = datetime.now()
+
+        current_streak = user.get("streak", 0)
+        last_activity = user.get("last_activity_date")
+
+        # If no previous activity or streak is already 0, nothing to reset
+        if last_activity is None or current_streak == 0:
+            logger.debug(
+                "streak_check_no_activity user_id=%s streak=%d",
+                user.get("_id"),
+                current_streak,
+            )
+            return {
+                "streak": current_streak,
+                "was_reset": False,
+                "days_since_last_activity": None,
+            }
+
+        login_day = login_date.date()
+
+        # Convert last_activity to date
+        if isinstance(last_activity, datetime):
+            last_activity_day = last_activity.date()
+        elif isinstance(last_activity, str):
+            last_activity_day = datetime.fromisoformat(last_activity).date()
+        else:
+            # Cannot determine last activity, keep streak as is
+            logger.warning(
+                "streak_check_invalid_last_activity user_id=%s type=%s",
+                user.get("_id"),
+                type(last_activity).__name__,
+            )
+            return {
+                "streak": current_streak,
+                "was_reset": False,
+                "days_since_last_activity": None,
+            }
+
+        day_diff = (login_day - last_activity_day).days
+
+        # If last activity was yesterday (1 day ago) or today (0 days), streak is still valid
+        if day_diff <= 1:
+            logger.debug(
+                "streak_check_valid user_id=%s streak=%d days_since=%d",
+                user.get("_id"),
+                current_streak,
+                day_diff,
+            )
+            return {
+                "streak": current_streak,
+                "was_reset": False,
+                "days_since_last_activity": day_diff,
+            }
+
+        # User missed more than 1 day - reset streak to 0
+        self.user_repository.update_streak(user["_id"], 0, login_date)
+        logger.info(
+            "streak_reset_on_login user_id=%s old_streak=%d days_missed=%d",
+            user.get("_id"),
+            current_streak,
+            day_diff - 1,
+        )
+        return {"streak": 0, "was_reset": True, "days_since_last_activity": day_diff}

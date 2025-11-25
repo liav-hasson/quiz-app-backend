@@ -35,6 +35,8 @@ class UserRepository(BaseRepository):
             "profile_picture": profile_picture,
             "experience": experience,
             "questions_count": 0,
+            "streak": 0,
+            "last_activity_date": None,
             "created_at": now,
             "updated_at": now,
         }
@@ -82,6 +84,32 @@ class UserRepository(BaseRepository):
             },
         )
         return result.modified_count > 0
+
+    def update_streak(self, user_id: str, streak: int, last_activity_date: datetime) -> bool:
+        """Update user's streak and last activity date.
+        
+        Args:
+            user_id: User's ID
+            streak: New streak value
+            last_activity_date: Date of last activity
+            
+        Returns:
+            bool: True if update successful
+        """
+        try:
+            result = self.collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {
+                    "$set": {
+                        "streak": streak,
+                        "last_activity_date": last_activity_date,
+                        "updated_at": datetime.now(),
+                    }
+                },
+            )
+            return result.modified_count > 0
+        except (InvalidId, TypeError):
+            return False
 
     def get_users_by_experience_range(
         self, min_exp: int = 0, max_exp: Optional[int] = None
@@ -148,6 +176,8 @@ class UserRepository(BaseRepository):
                 "google_id": google_id,
                 "experience": 0,
                 "questions_count": 0,
+                "streak": 0,
+                "last_activity_date": None,
                 "created_at": now,
                 "updated_at": now,
             }
