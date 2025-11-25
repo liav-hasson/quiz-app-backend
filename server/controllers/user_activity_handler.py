@@ -70,8 +70,13 @@ class UserActivityController:
             },
         )
 
+        # Calculate weighted XP based on difficulty
+        from models.repositories.leaderboard_repository import LeaderboardRepository
+        difficulty_multiplier = LeaderboardRepository.DIFFICULTY_MULTIPLIERS.get(difficulty, 1.0)
+        weighted_score = int((score or 0) * difficulty_multiplier)
+        
         self.user_repository.add_experience(
-            user.get("username", user.get("email", "")), score or 0
+            user.get("username", user.get("email", "")), weighted_score
         )
 
         # Update user's streak
@@ -90,6 +95,12 @@ class UserActivityController:
             user.get("_id"),
             score,
             streak_result["streak"],
+            "answer_saved answer_id=%s user_id=%s score=%s difficulty=%d weighted_score=%d",
+            answer_id,
+            user.get("_id"),
+            score,
+            difficulty,
+            weighted_score,
         )
 
         return answer_id
@@ -103,6 +114,149 @@ class UserActivityController:
         logger.info("leaderboard_fetched count=%d", len(top_ten))
 
         return top_ten
+
+    def get_best_category(
+        self,
+        authenticated_user: Optional[Dict[str, Any]] = None,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get user's best performing category.
+        
+        Returns:
+            {
+                "best_category": str,
+                "avg_score": float,
+                "total_attempts": int,
+                "total_score": int
+            }
+        """
+        user = self._resolve_user(authenticated_user, user_id=user_id)
+        
+        logger.info("fetching_best_category user_id=%s", user.get("_id"))
+        
+        result = self.questions_repository.get_user_best_category(user["_id"])
+        
+        if not result:
+            logger.info("no_quiz_history user_id=%s", user.get("_id"))
+            return {
+                "best_category": None,
+                "avg_score": 0.0,
+                "total_attempts": 0,
+                "total_score": 0
+            }
+        
+        logger.info(
+            "best_category_fetched user_id=%s category=%s avg_score=%.2f",
+            user.get("_id"),
+            result["category"],
+            result["avg_score"]
+        )
+        
+        return {
+            "best_category": result["category"],
+            "avg_score": result["avg_score"],
+            "total_attempts": result["total_attempts"],
+            "total_score": result["total_score"]
+        }
+
+    def get_performance_timeseries(
+        self,
+        authenticated_user: Optional[Dict[str, Any]] = None,
+        user_id: Optional[str] = None,
+        period: str = "30d",
+        granularity: str = "day",
+    ) -> Dict[str, Any]:
+        """Get time-series performance data for charting.
+        
+        Args:
+            authenticated_user: Authenticated user context
+            user_id: Optional user_id override
+            period: Time period - "7d", "30d", or "all"
+            granularity: Data point frequency - "day" or "week"
+            
+        Returns:
+            {
+                "period": str,
+                "data_points": [{"date": str, "avg_score": float, "attempts": int}],
+                "summary": {"total_attempts": int, "overall_avg": float}
+            }
+        """
+        user = self._resolve_user(authenticated_user, user_id=user_id)
+        
+        # Validate parameters
+        if period not in ["7d", "30d", "all"]:
+            period = "30d"
+        if granularity not in ["day", "week"]:
+            granularity = "day"
+        
+        logger.info(
+            "fetching_performance_timeseries user_id=%s period=%s granularity=%s",
+            user.get("_id"),
+            period,
+            granularity
+        )
+        
+        result = self.questions_repository.get_user_performance_timeseries(
+            user["_id"], period, granularity
+        )
+        
+        logger.info(
+            "performance_timeseries_fetched user_id=%s data_points=%d",
+            user.get("_id"),
+            len(result["data_points"])
+        )
+        
+        return result
+
+    def get_leaderboard_with_user_rank(
+        self,
+        authenticated_user: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Get leaderboard with top 10 users and current user's rank.
+        
+        Returns:
+            {
+                "leaderboard": [top 10 with ranks],
+                "current_user": {
+                    "rank": int,
+                    "username": str,
+                    "avg_score": int,
+                    "total_score": int,
+                    "attempts": int,
+                    "percentile": float
+                } | None,
+                "total_users": int
+            }
+        """
+        logger.info("fetching_leaderboard")
+        
+        # Get top 10 users from users collection
+        leaderboard = self.user_repository.get_leaderboard(limit=10)
+        
+        # Get total users with attempts
+        total_users = self.user_repository.collection.count_documents({"questions_count": {"$gt": 0}})
+        
+        # Get current user's rank if authenticated
+        current_user_data = None
+        if authenticated_user:
+            username = authenticated_user.get("username") or authenticated_user.get("email")
+            current_user_data = self.user_repository.get_user_rank(username)
+            
+            if current_user_data:
+                logger.info(
+                    "current_user_rank username=%s rank=%d percentile=%.1f",
+                    username,
+                    current_user_data["rank"],
+                    current_user_data["percentile"]
+                )
+        
+        logger.info("leaderboard_fetched top_users=%d total_users=%d", len(leaderboard), total_users)
+        
+        return {
+            "leaderboard": leaderboard,
+            "current_user": current_user_data,
+            "total_users": total_users
+        }
 
     def update_leaderboard_entry(self, user_id: str, username: str) -> Dict[str, Any]:
         """
@@ -129,18 +283,19 @@ class UserActivityController:
         exp = user.get("experience", 0)
         count = user.get("questions_count", 1)  # Default to 1 to avoid division by zero
 
-        # Calculate average score: exp / count
+        # Calculate weighted average score: weighted_xp / count
+        # Note: exp now contains weighted XP (score * difficulty_multiplier)
         avg_score = exp / count if count > 0 else 0
 
-        # Update leaderboard with calculated average
+        # Update leaderboard with calculated weighted average
         self.leaderboard_repository.add_or_update_entry(
             username=username,
             score=avg_score,
-            meta={"exp": exp, "count": count},
+            meta={"weighted_xp": exp, "count": count},
         )
 
         logger.info(
-            "leaderboard_entry_updated username=%s avg_score=%.2f exp=%d count=%d",
+            "leaderboard_entry_updated username=%s avg_weighted_score=%.2f weighted_xp=%d count=%d",
             username,
             avg_score,
             exp,

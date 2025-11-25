@@ -94,25 +94,27 @@ case "$MODE" in
       COMMITS="$COMMIT_MESSAGES"
       echo "[compute_next_version] Using COMMIT_MESSAGES env (length=$(echo -n "$COMMITS" | wc -c))" >&2
     else
-      # Get commits since the latest tag on current branch only
-      # This prevents counting commits from other branches
-      COMMITS=$(git log --pretty=%s --no-merges "$LATEST_TAG"..HEAD --first-parent 2>/dev/null || true)
+      # Get ONLY the current commit message
+      # The semantic version should be determined by the commit being built
+      COMMITS=$(git log -1 --pretty=%s HEAD 2>/dev/null || echo "")
       
-      # Count commits for diagnostics
-      COMMIT_COUNT=$(echo "$COMMITS" | grep -c . || echo "0")
-      echo "[compute_next_version] Collected $COMMIT_COUNT commit(s) on current branch since $LATEST_TAG" >&2
+      if [[ -z "$COMMITS" ]]; then
+        echo "[compute_next_version] WARNING: Could not get current commit message" >&2
+      else
+        echo "[compute_next_version] Current commit message: $COMMITS" >&2
+      fi
     fi
 
-    # Trim whitespace and check if we have actual commits
+    # Trim whitespace and check if we have a commit message
     COMMITS_TRIMMED=$(echo "$COMMITS" | xargs)
     if [[ -z "$COMMITS_TRIMMED" ]]; then
-      # No new commits - use patch bump for dev environments to avoid conflicts
+      # No commit message found - default to patch bump
       BUMP=patch
-      echo "[compute_next_version] No new commits found; defaulting to patch bump" >&2
+      echo "[compute_next_version] No commit message found; defaulting to patch bump" >&2
     else
       BUMP=$(decide_bump_from_commits "$COMMITS")
-      echo "[compute_next_version] Determined bump: $BUMP (based on commit prefixes)" >&2
-      echo "[compute_next_version] Sample commits: $(echo "$COMMITS" | head -n 3)" >&2
+      echo "[compute_next_version] Determined bump: $BUMP (based on commit message)" >&2
+      echo "[compute_next_version] Analyzed commit: $COMMITS" >&2
     fi
     ;;
   major|minor|patch)

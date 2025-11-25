@@ -148,6 +148,13 @@ def evaluate_answer_route():
         logger.info("evaluate_answer_route difficulty=%d", difficulty)
         evaluation = evaluate_answer(data["question"], data["answer"], difficulty)
         return jsonify(evaluation), 200
+    except ValueError as e:
+        # ValueError indicates AI response format error
+        logger.error("evaluate_answer_format_error error=%s", str(e), exc_info=True)
+        return jsonify({
+            "error": "Evaluation failed - AI response error",
+            "details": str(e)
+        }), 422  # 422 Unprocessable Entity
     except Exception as e:
         logger.error("evaluate_answer_failed error=%s", str(e), exc_info=True)
         return jsonify({"error": f"Failed to evaluate answer: {str(e)}"}), 500
