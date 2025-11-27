@@ -34,6 +34,48 @@ db.json
 # Testing
 .coverage
 htmlcov/
+# Python cache and temp files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*.~
+
+# macOS system files
+.DS_Store
+
+# Environment and package folders
+.env
+.venv/
+venv/
+
+# Test and coverage output
+.coverage
+htmlcov/
+*.cover
+*.coverage
+*.egg-info/
+dist/
+build/
+
+# IDE/editor folders
+.vscode/
+.idea/
+
+# Docker artifacts
+*.pid
+
+# Unneeded src folder
+src/
+
+# Pytest cache
 .pytest_cache/
 
 # Distribution
