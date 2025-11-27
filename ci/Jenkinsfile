@@ -12,7 +12,7 @@ pipeline {
                 spec:
                   containers:
                     - name: jnlp
-                      image: liavvv/jenkins-agent:1.14
+                      image: liavvv/jenkins-agent:1.15
                       imagePullPolicy: Always
                       volumeMounts:
                         - name: workspace-volume
