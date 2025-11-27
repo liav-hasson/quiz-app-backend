@@ -16,6 +16,7 @@ from typing import Callable, Optional
 
 from authlib.integrations.flask_client import OAuth
 from flask import Flask, current_app, g, request, jsonify
+from flask_cors import CORS
 from prometheus_flask_exporter import PrometheusMetrics
 
 try:  # pragma: no cover - optional dependency (dev/test envs)
@@ -338,7 +339,19 @@ def create_app() -> Flask:
     # Create Flask app instance
     app = Flask(__name__)
     app.config["REQUIRE_AUTHENTICATION"] = settings.require_authentication
-
+    
+    # Enable CORS for cross-origin requests
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "expose_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True
+        }
+    })
+    logger.info("CORS enabled for API endpoints")
+    
     # Initialize database and store dependencies in app.extensions
     if not initialize_database(app):
         logger.critical("Cannot start app without database connection")
