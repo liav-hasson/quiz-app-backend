@@ -16,6 +16,7 @@ bandit==1.8.6
 
 # Application runtime dependencies (needed for running tests)
 flask==3.0.0
+flask-cors==5.0.0
 openai>=2.0.0
 boto3==1.35.0
 gunicorn==23.0.0

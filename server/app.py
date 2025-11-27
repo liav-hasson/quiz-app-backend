@@ -208,10 +208,14 @@ def setup_middleware(app: Flask) -> None:
         if current_app.config.get("TESTING"):
             return None
 
-        if not current_app.config.get("REQUIRE_AUTHENTICATION", True):
+        require_auth = current_app.config.get("REQUIRE_AUTHENTICATION", True)
+        logger.info("auth_middleware_check path=%s require_auth=%s", request.path, require_auth)
+        
+        if not require_auth:
             return None
 
         if any(request.path.startswith(path) for path in exempt_paths):
+            logger.info("auth_middleware_exempt path=%s", request.path)
             return None
 
         # Get dependencies from app extensions (thread-safe)

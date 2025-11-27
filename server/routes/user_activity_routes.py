@@ -50,8 +50,13 @@ def save_answer():
 
     data = request.get_json(silent=True) or {}
     authenticated_user = getattr(g, "user", None)
+    logger.info("save_answer_called authenticated_user=%s has_auth_header=%s", 
+                authenticated_user is not None, 
+                bool(request.headers.get("Authorization")))
 
-    if not authenticated_user and not current_app.config.get("TESTING"):
+    # Allow anonymous usage when authentication is disabled
+    require_auth = current_app.config.get("REQUIRE_AUTHENTICATION", True)
+    if not authenticated_user and require_auth and not current_app.config.get("TESTING"):
         return jsonify({"error": "Authentication required"}), 401
 
     try:
@@ -76,7 +81,8 @@ def get_history():
         return jsonify({"error": "Service not initialized"}), 503
 
     authenticated_user = getattr(g, "user", None)
-    if not authenticated_user and not current_app.config.get("TESTING"):
+    require_auth = current_app.config.get("REQUIRE_AUTHENTICATION", True)
+    if not authenticated_user and require_auth and not current_app.config.get("TESTING"):
         return jsonify({"error": "Authentication required"}), 401
 
     try:
@@ -132,7 +138,8 @@ def get_best_category():
         return jsonify({"error": "Service not initialized"}), 503
 
     authenticated_user = getattr(g, "user", None)
-    if not authenticated_user and not current_app.config.get("TESTING"):
+    require_auth = current_app.config.get("REQUIRE_AUTHENTICATION", True)
+    if not authenticated_user and require_auth and not current_app.config.get("TESTING"):
         return jsonify({"error": "Authentication required"}), 401
 
     try:
@@ -155,7 +162,8 @@ def get_performance():
         return jsonify({"error": "Service not initialized"}), 503
 
     authenticated_user = getattr(g, "user", None)
-    if not authenticated_user and not current_app.config.get("TESTING"):
+    require_auth = current_app.config.get("REQUIRE_AUTHENTICATION", True)
+    if not authenticated_user and require_auth and not current_app.config.get("TESTING"):
         return jsonify({"error": "Authentication required"}), 401
 
     try:
