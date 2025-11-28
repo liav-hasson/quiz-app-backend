@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Flask
+instance/
+.webassets-cache
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# Database
+*.db
+*.sqlite
+db.json
+
+# Logs
+*.log
+
+# Testing
+.coverage
+htmlcov/
+# Python cache and temp files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*.~
+
+# macOS system files
+.DS_Store
+
+# Environment and package folders
+.env
+.venv/
+venv/
+
+# Test and coverage output
+.coverage
+htmlcov/
+*.cover
+*.coverage
+*.egg-info/
+dist/
+build/
+
+# IDE/editor folders
+.vscode/
+.idea/
+
+# Docker artifacts
+*.pid
+
+# Unneeded src folder
+src/
+
+# Pytest cache
+.pytest_cache/
+
+# Distribution
+dist/
+build/
+*.egg-info/
