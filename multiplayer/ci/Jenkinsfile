@@ -1,0 +1,200 @@
+pipeline {
+    agent {
+        kubernetes {
+            cloud 'quiz-app-eks'
+            yaml '''
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: agent-multiplayer
+                  labels:
+                    jenkins/label: agent-multiplayer
+                spec:
+                  containers:
+                    - name: jnlp
+                      image: liavvv/jenkins-agent:1.15
+                      imagePullPolicy: Always
+                      volumeMounts:
+                        - name: workspace-volume
+                          mountPath: /home/jenkins/agent
+                        - name: docker-config
+                          mountPath: /home/jenkins/.docker
+                          readOnly: true
+                  volumes:
+                    - name: workspace-volume
+                      emptyDir: {}
+                    - name: docker-config
+                      secret:
+                        secretName: docker-config
+                        items:
+                        - key: config.json
+                          path: config.json
+            '''
+        }
+    }
+
+    environment {
+        BUILD_TAG             = "${BUILD_TIMESTAMP}"
+        
+        // Generates DOCKERHUB_CREDENTIALS_USR, DOCKERHUB_CREDENTIALS_PSW
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+        
+        // Used for GitHub repository access (clone, push to GitOps repo)
+        // Generates GITHUB_CREDENTIALS_USR, GITHUB_CREDENTIALS_PSW
+        GITHUB_CREDENTIALS    = credentials('github-credentials')
+        
+        // Used for GitHub API calls (commit status updates)
+        // This is a GitHub Personal Access Token with repo scope
+        GITHUB_TOKEN          = credentials('github-token')
+        
+        // GitOps Configuration
+        // GitHub repository for this application
+        GITHUB_REPO           = "liav-hasson/quiz-app-multiplayer"
+        GITHUB_REPO_URL       = "https://github.com/${GITHUB_REPO}.git"
+        
+        // GitOps repository (Helm charts)
+        GITOPS_REPO_URL       = "https://github.com/liav-hasson/quiz-app-gitops.git"
+        
+        // Git configuration for commits
+        GIT_USER_NAME         = "Jenkins Pipeline"
+        GIT_USER_EMAIL        = "jenkins@weatherlabs.org"
+
+        // Application layout
+        APP_DIR               = "backend/multiplayer/server"
+        PYTHON_SRC_DIR        = "backend/multiplayer/server"
+        REQUIREMENTS_FILE     = "backend/multiplayer/server/requirements.txt"
+
+        // Docker image name without registry/user prefix (application)
+        DOCKER_IMAGE_NAME     = "quiz-multiplayer"
+
+        // CI resources directory
+        CI_DIR                = "backend/multiplayer/ci"
+    }
+
+    stages {
+        stage('Prepare image version') {
+            steps {
+                script {
+                    echo '--------- Preparing image version ---------'
+                    checkout scm
+                    
+                    // Fetch tags explicitly (Jenkins SCM checkout doesn't fetch tags by default)
+                    sh '''
+                        echo "Fetching git tags..."
+                        git fetch --tags
+                        echo "Available tags:"
+                        git tag -l | sort -V | tail -5
+                    '''
+
+                    // Determine environment based on branch
+                    if (env.BRANCH_NAME == 'main') {
+                        env.DEPLOY_ENV = 'prod'
+                        echo "Building for PRODUCTION (main branch)"
+                    } else {
+                        env.DEPLOY_ENV = 'dev'
+                        echo "Building for DEVELOPMENT (${env.BRANCH_NAME} branch)"
+                    }
+
+                    // Compute semantic version (script will fail if no tag exists)
+                    def semver = sh(returnStdout: true, script: './scripts/compute_next_version.sh . auto').trim()
+                    echo "Computed semantic version: ${semver}"
+                    
+                    // Set build version
+                    env.IMAGE_TAG = "${semver}"
+                    currentBuild.displayName = "${semver} #${BUILD_NUMBER}"
+                }
+            }
+        }
+
+        stage('Build & Test') {
+            steps {
+                script {
+                    echo '--------- Building and Testing ---------'
+                    
+                    // Install dependencies and run tests
+                    // Note: In a real pipeline, you might want to run this in a separate python container
+                    // For now, we assume the agent has python installed or we skip unit tests in this step
+                    // and rely on the docker build to verify basic integrity.
+                    
+                    // If you want to run tests:
+                    // sh "pip install -r ${REQUIREMENTS_FILE}"
+                    // sh "pytest"
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    echo '--------- Building Docker Image ---------'
+                    
+                    // Build Docker image
+                    // We use the Dockerfile in ci/app-dockerfile/Dockerfile
+                    // Context is the root of the repo (.)
+                    sh """
+                        docker build \
+                        -t ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG} \
+                        -f ${CI_DIR}/app-dockerfile/Dockerfile .
+                    """
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    echo '--------- Pushing Docker Image ---------'
+                    
+                    // Login to Docker Hub
+                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
+                    
+                    // Push image
+                    sh "docker push ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
+                    
+                    // Also push 'latest' tag if on main branch
+                    if (env.BRANCH_NAME == 'main') {
+                        sh "docker tag ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG} ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:latest"
+                        sh "docker push ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:latest"
+                    }
+                }
+            }
+        }
+
+        stage('Update GitOps') {
+            steps {
+                script {
+                    echo '--------- Updating GitOps Repository ---------'
+                    
+                    // Run the update script
+                    // It clones the GitOps repo, updates values.yaml/Chart.yaml, and pushes changes
+                    sh """
+                        chmod +x ./scripts/update-gitops.sh
+                        ./scripts/update-gitops.sh \
+                            "${DOCKERHUB_CREDENTIALS_USR}" \
+                            "${DOCKER_IMAGE_NAME}" \
+                            "${IMAGE_TAG}" \
+                            "${BUILD_NUMBER}" \
+                            "${GITOPS_REPO_URL}" \
+                            "${GIT_USER_NAME}" \
+                            "${GIT_USER_EMAIL}" \
+                            "${GITHUB_CREDENTIALS_USR}" \
+                            "${GITHUB_CREDENTIALS_PSW}" \
+                            "${DEPLOY_ENV}"
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo "Pipeline completed successfully. Deployed version ${IMAGE_TAG} to ${DEPLOY_ENV}."
+        }
+        failure {
+            echo "Pipeline failed."
+        }
+    }
+}

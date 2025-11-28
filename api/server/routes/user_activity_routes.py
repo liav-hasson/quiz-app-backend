@@ -1,0 +1,205 @@
+"""User activity routes for answer submission and leaderboard."""
+
+import logging
+from datetime import datetime
+from typing import Optional
+
+from flask import Blueprint, jsonify, request, g, current_app
+from controllers.user_activity_handler import UserActivityController
+from common.repositories.user_repository import UserRepository
+from common.repositories.questions_repository import QuestionsRepository
+from common.repositories.leaderboard_repository import LeaderboardRepository
+from utils.validation.schema import (
+    validate_difficulty,
+    validate_required_fields,
+    MIN_HISTORY_LIMIT,
+    MAX_HISTORY_LIMIT,
+    DEFAULT_HISTORY_LIMIT,
+)
+
+logger = logging.getLogger(__name__)
+
+user_activity_bp = Blueprint("user_activity", __name__, url_prefix="/api/user")
+
+# Will be set by server.py during initialization
+activity_controller: Optional[UserActivityController] = None
+
+
+def init_user_activity_routes(
+    user_repository: UserRepository,
+    questions_repository: QuestionsRepository,
+    leaderboard_repository: LeaderboardRepository,
+) -> UserActivityController:
+    """Initialize user activity routes with controllers.
+
+    Returns:
+        UserActivityController: The initialized controller instance.
+    """
+    global activity_controller
+    activity_controller = UserActivityController(
+        user_repository, questions_repository, leaderboard_repository
+    )
+    return activity_controller
+
+
+@user_activity_bp.route("/answers", methods=["POST"])
+def save_answer():
+    """Save a user's answer to a question for statistics tracking."""
+    if activity_controller is None:
+        return jsonify({"error": "Service not initialized"}), 503
+
+    data = request.get_json(silent=True) or {}
+    authenticated_user = getattr(g, "user", None)
+    logger.info("save_answer_called authenticated_user=%s has_auth_header=%s", 
+                authenticated_user is not None, 
+                bool(request.headers.get("Authorization")))
+
+    # Allow anonymous usage when authentication is disabled
+    require_auth = current_app.config.get("REQUIRE_AUTHENTICATION", True)
+    if not authenticated_user and require_auth and not current_app.config.get("TESTING"):
+        return jsonify({"error": "Authentication required"}), 401
+
+    try:
+        answer_id = activity_controller.save_user_answer(
+            data,
+            authenticated_user=authenticated_user,
+        )
+        return jsonify({"answer_id": answer_id}), 201
+    except ValueError as exc:
+        logger.warning("save_answer_validation_failed error=%s", str(exc))
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("answer_save_failed error=%s", str(exc), exc_info=True)
+        return jsonify({"error": f"Failed to save answer: {str(exc)}"}), 500
+
+
+@user_activity_bp.route("/history", methods=["GET"])
+def get_history():
+    """Return the authenticated user's question history."""
+
+    if activity_controller is None:
+        return jsonify({"error": "Service not initialized"}), 503
+
+    authenticated_user = getattr(g, "user", None)
+    require_auth = current_app.config.get("REQUIRE_AUTHENTICATION", True)
+    if not authenticated_user and require_auth and not current_app.config.get("TESTING"):
+        return jsonify({"error": "Authentication required"}), 401
+
+    try:
+        limit = int(request.args.get("limit", DEFAULT_HISTORY_LIMIT))
+        before_param = request.args.get("before")
+        before = None
+        if before_param:
+            try:
+                before = datetime.fromisoformat(before_param)
+            except ValueError:
+                logger.warning("invalid_before_timestamp value=%s", before_param)
+
+        history = activity_controller.get_user_history(
+            authenticated_user=authenticated_user,
+            user_id=request.args.get("user_id"),
+            email=request.args.get("email"),
+            limit=min(max(limit, MIN_HISTORY_LIMIT), MAX_HISTORY_LIMIT),
+            before=before,
+        )
+        return jsonify({"history": history, "count": len(history)}), 200
+    except ValueError as exc:
+        logger.warning("history_fetch_validation_failed error=%s", str(exc))
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("history_fetch_failed error=%s", str(exc), exc_info=True)
+        return jsonify({"error": "Failed to fetch user history"}), 500
+
+
+@user_activity_bp.route("/leaderboard", methods=["GET"])
+def get_leaderboard():
+    """Get leaderboard with top 10 users and current user's rank."""
+    if activity_controller is None:
+        return jsonify({"error": "Service not initialized"}), 503
+
+    authenticated_user = getattr(g, "user", None)
+    # Endpoint works for both authenticated and anonymous users
+    # Authenticated users get their rank/percentile, anonymous users get just the leaderboard
+
+    try:
+        result = activity_controller.get_leaderboard_with_user_rank(
+            authenticated_user=authenticated_user
+        )
+        return jsonify(result), 200
+    except Exception as exc:
+        logger.error("leaderboard_fetch_failed error=%s", str(exc), exc_info=True)
+        return jsonify({"error": "Failed to fetch leaderboard"}), 500
+
+
+@user_activity_bp.route("/best-category", methods=["GET"])
+def get_best_category():
+    """Get user's best performing category."""
+    if activity_controller is None:
+        return jsonify({"error": "Service not initialized"}), 503
+
+    authenticated_user = getattr(g, "user", None)
+    require_auth = current_app.config.get("REQUIRE_AUTHENTICATION", True)
+    if not authenticated_user and require_auth and not current_app.config.get("TESTING"):
+        return jsonify({"error": "Authentication required"}), 401
+
+    try:
+        result = activity_controller.get_best_category(
+            authenticated_user=authenticated_user
+        )
+        return jsonify(result), 200
+    except ValueError as exc:
+        logger.warning("best_category_fetch_failed error=%s", str(exc))
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("best_category_failed error=%s", str(exc), exc_info=True)
+        return jsonify({"error": "Failed to fetch best category"}), 500
+
+
+@user_activity_bp.route("/performance", methods=["GET"])
+def get_performance():
+    """Get time-series performance data for charting."""
+    if activity_controller is None:
+        return jsonify({"error": "Service not initialized"}), 503
+
+    authenticated_user = getattr(g, "user", None)
+    require_auth = current_app.config.get("REQUIRE_AUTHENTICATION", True)
+    if not authenticated_user and require_auth and not current_app.config.get("TESTING"):
+        return jsonify({"error": "Authentication required"}), 401
+
+    try:
+        period = request.args.get("period", "30d")
+        granularity = request.args.get("granularity", "day")
+        
+        # Validate parameters
+        if period not in ["7d", "30d", "all"]:
+            return jsonify({"error": "Invalid period. Must be 7d, 30d, or all"}), 400
+        if granularity not in ["day", "week"]:
+            return jsonify({"error": "Invalid granularity. Must be day or week"}), 400
+        
+        result = activity_controller.get_performance_timeseries(
+            authenticated_user=authenticated_user,
+            period=period,
+            granularity=granularity
+        )
+        return jsonify(result), 200
+    except ValueError as exc:
+        logger.warning("performance_fetch_failed error=%s", str(exc))
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("performance_failed error=%s", str(exc), exc_info=True)
+        return jsonify({"error": "Failed to fetch performance data"}), 500
+
+
+@user_activity_bp.route("/profile", methods=["GET"])
+def get_profile():
+    """Get authenticated user's profile stats."""
+    if activity_controller is None:
+        return jsonify({"error": "Service not initialized"}), 503
+        
+    # Get user from token (g.user)
+    if not hasattr(g, "user") or not g.user:
+        return jsonify({"error": "Authentication required"}), 401
+        
+    user_id = g.user.get("_id")
+    profile = activity_controller.get_user_profile(user_id)
+    return jsonify(profile)
