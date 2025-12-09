@@ -1,7 +1,4 @@
 from flask import Blueprint, jsonify, request, current_app, g
-from server.utils.auth_middleware import socket_authenticated # We might need HTTP auth middleware too
-
-# Simple HTTP auth middleware for routes
 from functools import wraps
 def http_authenticated(f):
     @wraps(f)
@@ -49,6 +46,56 @@ def init_lobby_routes(lobby_controller):
                 return jsonify({'error': 'Lobby not found'}), 404
             
             return jsonify({'lobby': lobby}), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @lobby_bp.route('/lobby', methods=['POST'])
+    @http_authenticated
+    def create_lobby():
+        """Create a new lobby"""
+        try:
+            user = g.user
+            data = request.get_json() or {}
+            
+            # Extract settings with defaults
+            categories = data.get('categories', ['General']) # Default category
+            difficulty = data.get('difficulty', 2) # Medium
+            question_timer = data.get('question_timer', 30)
+            max_players = data.get('max_players', 8)
+            
+            result = lobby_controller.create_lobby(
+                user, categories, difficulty, question_timer, max_players
+            )
+            
+            # Transform response for frontend compatibility
+            response = {
+                'code': result.get('lobby_code'),
+                'lobbyId': result.get('_id'),
+                'lobby': result
+            }
+            
+            return jsonify(response), 201
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @lobby_bp.route('/join', methods=['POST'])
+    @http_authenticated
+    def join_lobby():
+        """Join an existing lobby"""
+        try:
+            user = g.user
+            data = request.get_json() or {}
+            code = data.get('code')
+            
+            if not code:
+                return jsonify({'error': 'Lobby code is required'}), 400
+                
+            result = lobby_controller.join_lobby(user, code)
+            return jsonify(result), 200
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     

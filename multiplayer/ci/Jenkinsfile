@@ -12,7 +12,7 @@ pipeline {
                 spec:
                   containers:
                     - name: jnlp
-                      image: liavvv/jenkins-agent:1.15
+                      image: liavvv/jenkins-agent:1.16
                       imagePullPolicy: Always
                       volumeMounts:
                         - name: workspace-volume
@@ -73,6 +73,13 @@ pipeline {
 
     stages {
         stage('Prepare image version') {
+            when {
+                anyOf {
+                    changeset "backend/multiplayer/**"
+                    changeset "backend/common/**"
+                    triggeredBy 'UserIdCause'
+                }
+            }
             steps {
                 script {
                     echo '--------- Preparing image version ---------'
@@ -106,24 +113,160 @@ pipeline {
             }
         }
 
-        stage('Build & Test') {
+        stage('Testing stage') {
+            when {
+                anyOf {
+                    changeset "backend/multiplayer/**"
+                    changeset "backend/common/**"
+                    triggeredBy 'UserIdCause'
+                }
+            }
             steps {
                 script {
-                    echo '--------- Building and Testing ---------'
-                    
-                    // Install dependencies and run tests
-                    // Note: In a real pipeline, you might want to run this in a separate python container
-                    // For now, we assume the agent has python installed or we skip unit tests in this step
-                    // and rely on the docker build to verify basic integrity.
-                    
-                    // If you want to run tests:
-                    // sh "pip install -r ${REQUIREMENTS_FILE}"
-                    // sh "pytest"
+                    echo '--------- Starting checkout and testing ---------'
+
+                    echo '--------- Running pylint test ---------'
+                    sh '''
+                        # Run pylint on all Python source files recursively with proper PYTHONPATH
+                        echo "Running pylint on Python source files..."
+                        
+                        # Set PYTHONPATH to server directory so imports resolve correctly
+                        export PYTHONPATH="${WORKSPACE}/server"
+                        
+                        # Run pylint recursively on entire server directory
+                        pylint server/ --score=yes --fail-under=5.0 --disable=C0103,E0401 --recursive=y || {
+                            echo "Pylint checks failed!"
+                            exit 1
+                        }
+                    '''
+                    echo 'Pylint checks passed!'
+
+                    echo '--------- Running unit tests ---------'
+                    sh '''
+                        # Run pytest with proper PYTHONPATH on all test files
+                        echo "Running pytest on complete test suite..."
+                        
+                        export PYTHONPATH="${WORKSPACE}/server"
+                        
+                        cd server
+                        pytest tests/ --tb=short -v || {
+                            echo "Tests failed!"
+                            exit 1
+                        }
+                        
+                        echo "All tests passed!"
+                    '''
+                    echo 'Unit tests completed!'
+
+                    echo '--------- Running dependency vulnerability scan ---------'
+                    sh '''
+                        # Run safety check on production dependencies only
+                        # Focus on src/requirements.txt (production dependencies)
+                        # Exit code 64 means vulnerabilities found, 0 means clean
+                        safety check --json --file "${REQUIREMENTS_FILE}" || {
+                            if [ $? -eq 64 ]; then
+                                echo "CRITICAL: Vulnerabilities found in production dependencies!"
+                                echo "Pipeline failed due to security vulnerabilities in $REQUIREMENTS_FILE"
+                                safety check --file "${REQUIREMENTS_FILE}" --output text
+                                exit 1
+                            else
+                                echo "Safety check failed with unexpected error"
+                                exit 1
+                            fi
+                        }
+                    '''
+                    echo 'Dependency vulnerability scan passed!'
+                }
+            }
+        }
+
+        stage('Python Static Security Analysis') {
+            when {
+                anyOf {
+                    changeset "backend/multiplayer/**"
+                    changeset "backend/common/**"
+                    triggeredBy 'UserIdCause'
+                }
+            }
+            steps {
+                script {
+                    echo '--------- Running Python static security analysis ---------'
+                    sh '''
+                        # Run Bandit security analysis on Python source code (exclude tests)
+                        echo "Scanning Python code with Bandit..."
+                        bandit -r "${PYTHON_SRC_DIR}" -x "*/tests/*" -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
+                        
+                        # Display results in human-readable format  
+                        echo "Bandit scan results:"
+                        bandit -r "${PYTHON_SRC_DIR}" -x "*/tests/*" -f txt || true
+                        
+                        # Check if high/medium severity issues found (exit codes 1-2)
+                        if [ "${BANDIT_EXIT_CODE:-0}" -eq 1 ] || [ "${BANDIT_EXIT_CODE:-0}" -eq 2 ]; then
+                            echo "CRITICAL: High/Medium severity security issues found in Python code!"
+                            echo "Pipeline failed due to Python security vulnerabilities"
+                            echo "Fix the security issues above and retry the build"
+                            exit 1
+                        fi
+                    '''
+                    echo 'Python static security analysis passed!'
+                }
+            }
+            post {
+                always {
+                    // Archive the Bandit report for review
+                    archiveArtifacts artifacts: 'bandit-report.json', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Dockerfile Security Scan') {
+            when {
+                anyOf {
+                    changeset "backend/multiplayer/**"
+                    changeset "backend/common/**"
+                    triggeredBy 'UserIdCause'
+                }
+            }
+            steps {
+                script {
+                    echo '--------- Running Dockerfile security scan ---------'
+                    sh '''
+                        # Run Hadolint security scan on Dockerfile
+                        # Check for security issues, best practices, and compliance
+                        echo "Scanning Dockerfile with Hadolint..."
+                        hadolint --format json ${CI_DIR}/app-dockerfile/Dockerfile > hadolint-report.json || HADOLINT_EXIT_CODE=$?
+                        
+                        # Display results in human-readable format
+                        echo "Hadolint scan results:"
+                        hadolint ${CI_DIR}/app-dockerfile/Dockerfile || true
+                        
+                        # Check if critical/error level issues found
+                        if [ "${HADOLINT_EXIT_CODE:-0}" -ne 0 ]; then
+                            echo "CRITICAL: Dockerfile security issues found!"
+                            echo "Pipeline failed due to Dockerfile security violations"
+                            echo "Fix the issues above and retry the build"
+                            exit 1
+                        fi
+                    '''
+                    echo 'Dockerfile security scan passed!'
+                }
+            }
+            post {
+                always {
+                    // Archive the Hadolint report for review
+                    archiveArtifacts artifacts: 'hadolint-report.json', allowEmptyArchive: true
                 }
             }
         }
 
         stage('Build Docker Image') {
+            when {
+                anyOf {
+                    changeset "backend/multiplayer/**"
+                    changeset "backend/common/**"
+                    triggeredBy 'UserIdCause'
+                }
+            }
             steps {
                 script {
                     echo '--------- Building Docker Image ---------'
@@ -141,6 +284,13 @@ pipeline {
         }
 
         stage('Push Docker Image') {
+            when {
+                anyOf {
+                    changeset "backend/multiplayer/**"
+                    changeset "backend/common/**"
+                    triggeredBy 'UserIdCause'
+                }
+            }
             steps {
                 script {
                     echo '--------- Pushing Docker Image ---------'
@@ -161,6 +311,13 @@ pipeline {
         }
 
         stage('Update GitOps') {
+            when {
+                anyOf {
+                    changeset "backend/multiplayer/**"
+                    changeset "backend/common/**"
+                    triggeredBy 'UserIdCause'
+                }
+            }
             steps {
                 script {
                     echo '--------- Updating GitOps Repository ---------'

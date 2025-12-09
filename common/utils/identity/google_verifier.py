@@ -12,7 +12,7 @@ except ImportError:  # pragma: no cover - fallback for local dev/tests
     requests = None  # type: ignore
     id_token = None  # type: ignore
 
-from utils.config import get_google_client_id
+from common.utils.config import get_google_client_id
 
 logger = logging.getLogger(__name__)
 

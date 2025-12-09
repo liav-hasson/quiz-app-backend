@@ -12,7 +12,7 @@ pipeline {
                 spec:
                   containers:
                     - name: jnlp
-                      image: liavvv/jenkins-agent:1.15
+                      image: liavvv/jenkins-agent:1.16
                       imagePullPolicy: Always
                       volumeMounts:
                         - name: workspace-volume
@@ -73,6 +73,13 @@ pipeline {
 
     stages {
         stage('Prepare image version') {
+            when {
+                anyOf {
+                    changeset "backend/api/**"
+                    changeset "backend/common/**"
+                    triggeredBy 'UserIdCause'
+                }
+            }
             steps {
                 script {
                     echo '--------- Preparing image version ---------'
@@ -115,6 +122,13 @@ pipeline {
         }
 
         stage('Testing stage') {
+            when {
+                anyOf {
+                    changeset "backend/api/**"
+                    changeset "backend/common/**"
+                    triggeredBy 'UserIdCause'
+                }
+            }
             steps {
                 script {
                     echo '--------- Starting checkout and testing ---------'
@@ -175,6 +189,13 @@ pipeline {
         }
 
         stage('Python Static Security Analysis') {
+            when {
+                anyOf {
+                    changeset "backend/api/**"
+                    changeset "backend/common/**"
+                    triggeredBy 'UserIdCause'
+                }
+            }
             steps {
                 script {
                     echo '--------- Running Python static security analysis ---------'
@@ -207,6 +228,13 @@ pipeline {
         }
 
         stage('Dockerfile Security Scan') {
+            when {
+                anyOf {
+                    changeset "backend/api/**"
+                    changeset "backend/common/**"
+                    triggeredBy 'UserIdCause'
+                }
+            }
             steps {
                 script {
                     echo '--------- Running Dockerfile security scan ---------'
@@ -240,6 +268,13 @@ pipeline {
         }
 
         stage('Build Docker Image') {
+            when {
+                anyOf {
+                    changeset "backend/api/**"
+                    changeset "backend/common/**"
+                    triggeredBy 'UserIdCause'
+                }
+            }
             steps {
                 script {
                     sh '''
@@ -260,6 +295,13 @@ pipeline {
         }
 
         stage('Update GitOps Repository') {
+            when {
+                anyOf {
+                    changeset "backend/api/**"
+                    changeset "backend/common/**"
+                    triggeredBy 'UserIdCause'
+                }
+            }
             steps {
                 echo '--------- Updating GitOps Repository ---------'
                 script {
@@ -297,7 +339,14 @@ pipeline {
 
         stage('Tag Application Release') {
             when {
-                expression { env.DEPLOY_ENV == 'prod' }
+                allOf {
+                    expression { env.DEPLOY_ENV == 'prod' }
+                    anyOf {
+                        changeset "backend/api/**"
+                        changeset "backend/common/**"
+                        triggeredBy 'UserIdCause'
+                    }
+                }
             }
             steps {
                 echo '--------- Tagging Application Release ---------'

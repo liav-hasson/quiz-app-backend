@@ -29,6 +29,28 @@ class Settings:
     openai_max_tokens_eval: int
     openai_ssm_parameter_name: str
     require_authentication: bool
+    # WebSocket configuration
+    websocket_cors_origins: str
+    websocket_ping_interval: int
+    websocket_ping_timeout: int
+    # Redis configuration
+    redis_host: Optional[str]
+    redis_port: int
+    redis_db: int
+    # API server configuration (for multiplayer server to call API)
+    api_host: str
+    api_port: int
+    # Multiplayer lobby configuration
+    lobby_code_length: int
+    lobby_expiry_hours: int
+    min_players_to_start: int
+    # Rate limiting configuration
+    rate_limit_questions_max: int
+    rate_limit_questions_window: int
+    rate_limit_evaluations_max: int
+    rate_limit_evaluations_window: int
+    rate_limit_multiplayer_games_max: int
+    rate_limit_multiplayer_games_window: int
 
     @staticmethod
     def from_env(env: Mapping[str, str] | None = None) -> "Settings":
@@ -62,7 +84,34 @@ class Settings:
             openai_max_tokens_eval=int(env.get("OPENAI_MAX_TOKENS_EVAL", "300")),
             openai_ssm_parameter_name=env.get(
                 "OPENAI_SSM_PARAMETER", "/devops-quiz/openai-api-key"
-            ),            
+            ),
+            
+            # websocket configuration
+            websocket_cors_origins=env.get("WEBSOCKET_CORS_ORIGINS", "*"),
+            websocket_ping_interval=int(env.get("WEBSOCKET_PING_INTERVAL", "25")),
+            websocket_ping_timeout=int(env.get("WEBSOCKET_PING_TIMEOUT", "60")),
+            
+            # redis configuration (optional - for scaling WebSocket across multiple instances)
+            redis_host=env.get("REDIS_HOST"),
+            redis_port=int(env.get("REDIS_PORT", "6379")),
+            redis_db=int(env.get("REDIS_DB", "0")),
+            
+            # api server configuration (for multiplayer to call API)
+            api_host=env.get("API_HOST", "backend-api"),
+            api_port=int(env.get("API_PORT", "5000")),
+            
+            # multiplayer lobby configuration
+            lobby_code_length=int(env.get("LOBBY_CODE_LENGTH", "6")),
+            lobby_expiry_hours=int(env.get("LOBBY_EXPIRY_HOURS", "2")),
+            min_players_to_start=int(env.get("MIN_PLAYERS_TO_START", "2")),
+            
+            # rate limiting configuration
+            rate_limit_questions_max=int(env.get("RATE_LIMIT_QUESTIONS_MAX", "10")),
+            rate_limit_questions_window=int(env.get("RATE_LIMIT_QUESTIONS_WINDOW", "3600")),  # 1 hour
+            rate_limit_evaluations_max=int(env.get("RATE_LIMIT_EVALUATIONS_MAX", "10")),
+            rate_limit_evaluations_window=int(env.get("RATE_LIMIT_EVALUATIONS_WINDOW", "3600")),  # 1 hour
+            rate_limit_multiplayer_games_max=int(env.get("RATE_LIMIT_MULTIPLAYER_GAMES_MAX", "10")),
+            rate_limit_multiplayer_games_window=int(env.get("RATE_LIMIT_MULTIPLAYER_GAMES_WINDOW", "3600")),  # 1 hour
         )
 
 

@@ -1,3 +1,8 @@
+# -----------------------------
+# Jenkins agent dockerfile
+# Image used by both backend microservices
+# Centrelized in the common directory
+# -----------------------------
 FROM jenkins/inbound-agent:jdk17
 
 # Use root for setup
@@ -9,6 +14,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # -----------------------------
 # 1. Base system dependencies
 # -----------------------------
+# hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -37,7 +43,7 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages --upgrade --ig
         wheel==0.45.1
 
 # Copy and install all CI/testing and application dependencies from agent_requirements.txt
-COPY ci/jenkins-agent/agent_requirements.txt /tmp/agent_requirements.txt
+COPY common/jenkins-agent/agent_requirements.txt /tmp/agent_requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages \
         -r /tmp/agent_requirements.txt \
         --ignore-installed packaging && \
@@ -85,6 +91,7 @@ RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/s
 # -----------------------------
 # 7. Install Docker CLI (for cosign authentication)
 # -----------------------------
+# hadolint ignore=DL3008
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian bullseye stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
     apt-get update && \

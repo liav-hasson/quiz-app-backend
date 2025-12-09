@@ -4,7 +4,7 @@ FROM python:3.11-slim AS build-stage
 WORKDIR /build
 
 # Copy requirements and install dependencies system-wide in build-stage
-COPY backend/api/server/requirements.txt .
+COPY api/server/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # --- Final Stage ---
@@ -25,8 +25,8 @@ ENV PATH=/usr/local/bin:/home/appuser/.local/bin:$PATH \
 COPY --from=build-stage /usr/local /usr/local
 
 # Copy server code
-COPY --chown=appuser:appuser backend/api/server/ /app/
-COPY --chown=appuser:appuser backend/common/ /app/common/
+COPY --chown=appuser:appuser api/server/ /app/
+COPY --chown=appuser:appuser common/ /app/common/
 
 # Switch to non-root user
 USER appuser
@@ -39,7 +39,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health').read()"
 
 # Set PYTHONPATH to app root so all modules can be imported
-ENV PYTHONPATH=/app:${PYTHONPATH}
+ENV PYTHONPATH=/app
 
 # Run server using gunicorn with factory pattern (app:create_app() properly initializes the app)
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "60", "app:create_app()"]

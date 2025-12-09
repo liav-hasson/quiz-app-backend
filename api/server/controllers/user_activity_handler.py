@@ -71,7 +71,7 @@ class UserActivityController:
         )
 
         # Calculate weighted XP based on difficulty
-        from models.repositories.leaderboard_repository import LeaderboardRepository
+        from common.repositories.leaderboard_repository import LeaderboardRepository
         difficulty_multiplier = LeaderboardRepository.DIFFICULTY_MULTIPLIERS.get(difficulty, 1.0)
         weighted_score = int((score or 0) * difficulty_multiplier)
         

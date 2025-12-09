@@ -85,6 +85,28 @@ class UserRepository(BaseRepository):
         )
         return result.modified_count > 0
 
+    def add_bonus_xp(self, user_id: str, points: int) -> bool:
+        """Add bonus XP (from daily missions, etc.) without incrementing questions_count.
+        
+        Args:
+            user_id: User's ObjectId as string
+            points: XP points to add
+            
+        Returns:
+            bool: True if update successful
+        """
+        try:
+            result = self.collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {
+                    "$inc": {"experience": points},
+                    "$set": {"updated_at": datetime.now()},
+                },
+            )
+            return result.modified_count > 0
+        except InvalidId:
+            return False
+
     def update_streak(self, user_id: str, streak: int, last_activity_date: datetime) -> bool:
         """Update user's streak and last activity date.
         

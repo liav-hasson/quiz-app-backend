@@ -203,3 +203,41 @@ def get_profile():
     user_id = g.user.get("_id")
     profile = activity_controller.get_user_profile(user_id)
     return jsonify(profile)
+
+
+@user_activity_bp.route("/claim-bonus-xp", methods=["POST"])
+def claim_bonus_xp():
+    """Claim bonus XP from daily missions or other rewards."""
+    if activity_controller is None:
+        return jsonify({"error": "Service not initialized"}), 503
+        
+    # Get user from token (g.user)
+    if not hasattr(g, "user") or not g.user:
+        return jsonify({"error": "Authentication required"}), 401
+    
+    data = request.get_json(silent=True) or {}
+    xp_amount = data.get("xp", 0)
+    source = data.get("source", "unknown")
+    
+    if not isinstance(xp_amount, int) or xp_amount <= 0:
+        return jsonify({"error": "Invalid XP amount"}), 400
+    
+    if xp_amount > 500:  # Sanity check - max 500 XP per claim
+        return jsonify({"error": "XP amount too large"}), 400
+    
+    user_id = g.user.get("_id")
+    username = g.user.get("username") or g.user.get("email")
+    
+    try:
+        success = activity_controller.user_repository.add_bonus_xp(user_id, xp_amount)
+        if success:
+            logger.info(
+                "bonus_xp_claimed user_id=%s username=%s xp=%d source=%s",
+                user_id, username, xp_amount, source
+            )
+            return jsonify({"success": True, "xp_claimed": xp_amount}), 200
+        else:
+            return jsonify({"error": "Failed to claim XP"}), 500
+    except Exception as exc:
+        logger.error("claim_bonus_xp_failed error=%s", str(exc), exc_info=True)
+        return jsonify({"error": "Failed to claim bonus XP"}), 500
