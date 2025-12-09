@@ -113,8 +113,10 @@ class AuthController:
 
             # Return the response in your desired format
             return {
+                "id": str(user.get("_id")),  # Add user ID for frontend
                 "email": email,
                 "name": name,
+                "username": name,  # Add username alias
                 "picture": picture,
                 "token": app_token,
                 "streak": user.get("streak", 0),

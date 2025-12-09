@@ -153,7 +153,7 @@ class FakeMongoDatabase:
 def _patch_db_controller() -> None:
     """Replace DBController.connect with in-memory stub for tests."""
 
-    from models import database as database_module
+    from common import database as database_module
 
     original_class = database_module.DBController
 

@@ -9,10 +9,11 @@ Routes layer handles HTTP protocol binding only:
 
 import logging
 from typing import Optional
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from controllers.quiz_controller import QuizController
 from common.repositories.quiz_repository import QuizRepository
-from common.utils.ai import generate_question, evaluate_answer
+from common.utils.ai import get_service
+from common.utils.rate_limiter import get_question_limiter, get_evaluation_limiter
 from utils.validation.schema import validate_difficulty, validate_required_fields
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,17 @@ quiz_bp = Blueprint("quiz", __name__, url_prefix="/api")
 
 # Will be set by server.py during initialization
 quiz_controller: Optional[QuizController] = None
+
+# Rate limiters
+question_limiter = get_question_limiter()
+evaluation_limiter = get_evaluation_limiter()
+
+
+def _get_custom_ai_settings():
+    """Extract custom AI settings from request headers."""
+    custom_api_key = request.headers.get("X-OpenAI-API-Key")
+    custom_model = request.headers.get("X-OpenAI-Model")
+    return custom_api_key, custom_model
 
 
 def init_quiz_routes(quiz_repo: QuizRepository):
@@ -88,6 +100,33 @@ def generate_question_route():
         logger.warning("generate_question_validation_failed error=%s", str(e))
         return jsonify({"error": str(e)}), 400
 
+    # Rate limiting - get user ID from auth or use IP as fallback
+    user = getattr(g, "user", None)
+    user_id = user.get("_id") if user else request.remote_addr
+    
+    allowed, remaining, reset_time = question_limiter.check_rate_limit(
+        user_id, "question_generate"
+    )
+    
+    # Add rate limit headers
+    headers = {
+        "X-RateLimit-Limit": str(question_limiter.config.max_requests),
+        "X-RateLimit-Remaining": str(remaining),
+        "X-RateLimit-Reset": str(reset_time),
+    }
+    
+    if not allowed:
+        logger.warning(
+            "rate_limit_exceeded_question user=%s",
+            user_id
+        )
+        return jsonify({
+            "error": "Rate limit exceeded. Please wait before generating more questions.",
+            "limit": question_limiter.config.max_requests,
+            "window_seconds": question_limiter.config.window_seconds,
+            "reset_time": reset_time,
+        }), 429, headers
+
     try:
         logger.info(
             "generate_question_route category=%s subject=%s difficulty=%d",
@@ -103,15 +142,22 @@ def generate_question_route():
                 data["category"],
                 data["subject"],
             )
-            return jsonify({"error": "No keywords found for this category and subject"}), 404
+            return jsonify({"error": "No keywords found for this category and subject"}), 404, headers
 
         style_modifier = quiz_controller.get_random_style_modifier(data["category"], data["subject"])
-        question = generate_question(
+        
+        # Get custom AI settings from headers
+        custom_api_key, custom_model = _get_custom_ai_settings()
+        
+        ai_service = get_service()
+        question = ai_service.generate_question(
             data["category"],
             data["subject"],
             keyword,
             difficulty,
             style_modifier,
+            custom_api_key=custom_api_key,
+            custom_model=custom_model,
         )
 
         return jsonify({
@@ -120,7 +166,7 @@ def generate_question_route():
             "category": data["category"],
             "subject": data["subject"],
             "difficulty": difficulty,
-        }), 200
+        }), 200, headers
     except Exception as e:
         logger.error(
             "generate_question_failed category=%s subject=%s error=%s",
@@ -129,7 +175,7 @@ def generate_question_route():
             str(e),
             exc_info=True,
         )
-        return jsonify({"error": f"Failed to generate question: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to generate question: {str(e)}"}), 500, headers
 
 
 @quiz_bp.route("/answer/evaluate", methods=["POST"])
@@ -144,18 +190,135 @@ def evaluate_answer_route():
         logger.warning("evaluate_answer_validation_failed error=%s", str(e))
         return jsonify({"error": str(e)}), 400
 
+    # Rate limiting - get user ID from auth or use IP as fallback
+    user = getattr(g, "user", None)
+    user_id = user.get("_id") if user else request.remote_addr
+    
+    allowed, remaining, reset_time = evaluation_limiter.check_rate_limit(
+        user_id, "answer_evaluate"
+    )
+    
+    # Add rate limit headers
+    headers = {
+        "X-RateLimit-Limit": str(evaluation_limiter.config.max_requests),
+        "X-RateLimit-Remaining": str(remaining),
+        "X-RateLimit-Reset": str(reset_time),
+    }
+    
+    if not allowed:
+        logger.warning(
+            "rate_limit_exceeded_evaluation user=%s",
+            user_id
+        )
+        return jsonify({
+            "error": "Rate limit exceeded. Please wait before submitting more answers.",
+            "limit": evaluation_limiter.config.max_requests,
+            "window_seconds": evaluation_limiter.config.window_seconds,
+            "reset_time": reset_time,
+        }), 429, headers
+
     try:
         logger.info("evaluate_answer_route difficulty=%d", difficulty)
-        evaluation = evaluate_answer(data["question"], data["answer"], difficulty)
-        return jsonify(evaluation), 200
+        
+        # Get custom AI settings from headers
+        custom_api_key, custom_model = _get_custom_ai_settings()
+        
+        ai_service = get_service()
+        evaluation = ai_service.evaluate_answer(
+            data["question"],
+            data["answer"],
+            difficulty,
+            custom_api_key=custom_api_key,
+            custom_model=custom_model,
+        )
+        return jsonify(evaluation), 200, headers
     except ValueError as e:
         # ValueError indicates AI response format error
         logger.error("evaluate_answer_format_error error=%s", str(e), exc_info=True)
         return jsonify({
             "error": "Evaluation failed - AI response error",
             "details": str(e)
-        }), 422  # 422 Unprocessable Entity
+        }), 422, headers  # 422 Unprocessable Entity
     except Exception as e:
         logger.error("evaluate_answer_failed error=%s", str(e), exc_info=True)
-        return jsonify({"error": f"Failed to evaluate answer: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to evaluate answer: {str(e)}"}), 500, headers
 
+
+@quiz_bp.route("/ai/test", methods=["POST"])
+def test_ai_configuration():
+    """Test AI configuration with custom API key and model.
+    
+    Accepts custom settings via headers:
+    - X-OpenAI-API-Key: Custom API key
+    - X-OpenAI-Model: Custom model name
+    
+    Makes a simple API call to verify the configuration works.
+    """
+    custom_api_key, custom_model = _get_custom_ai_settings()
+    
+    if not custom_api_key and not custom_model:
+        return jsonify({
+            "success": True,
+            "message": "Using default server configuration",
+            "model": None,
+            "custom_key": False,
+        }), 200
+    
+    try:
+        from common.utils.ai import OpenAIProvider
+        
+        # Create provider with custom key if provided
+        provider = OpenAIProvider(api_key=custom_api_key) if custom_api_key else OpenAIProvider()
+        
+        # Determine which model to test
+        model_to_test = custom_model or "gpt-4o-mini"
+        
+        # Use the provider's chat_completion method which handles parameter adaptation
+        response = provider.chat_completion(
+            model=model_to_test,
+            messages=[{"role": "user", "content": "Say 'OK' if you can read this."}],
+            max_tokens=10,
+        )
+        
+        result = response.choices[0].message.content.strip() if response.choices else ""
+        
+        logger.info(
+            "ai_config_test_success model=%s custom_key=%s",
+            model_to_test,
+            "yes" if custom_api_key else "no",
+        )
+        
+        return jsonify({
+            "success": True,
+            "message": f"Successfully connected to OpenAI using model '{model_to_test}'",
+            "model": model_to_test,
+            "custom_key": bool(custom_api_key),
+            "response": result,
+        }), 200
+        
+    except Exception as e:
+        error_message = str(e)
+        logger.error("ai_config_test_failed error=%s", error_message)
+        
+        # Provide helpful error messages
+        if "invalid_api_key" in error_message.lower() or "incorrect api key" in error_message.lower():
+            return jsonify({
+                "success": False,
+                "error": "Invalid API key. Please check your OpenAI API key.",
+                "model": custom_model,
+                "custom_key": bool(custom_api_key),
+            }), 401
+        elif "model" in error_message.lower() and ("not found" in error_message.lower() or "does not exist" in error_message.lower()):
+            return jsonify({
+                "success": False,
+                "error": f"Model '{custom_model}' not found. Please check the model name.",
+                "model": custom_model,
+                "custom_key": bool(custom_api_key),
+            }), 400
+        else:
+            return jsonify({
+                "success": False,
+                "error": f"Configuration test failed: {error_message}",
+                "model": custom_model,
+                "custom_key": bool(custom_api_key),
+            }), 500

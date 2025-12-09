@@ -136,7 +136,11 @@ class GameSessionRepository(BaseRepository):
         return session["current_question_index"] >= len(session["questions"])
 
     def fetch_questions_for_game(self, categories: List[str], difficulty: int, count: int) -> List[Dict[str, Any]]:
-        """Fetch questions from DB or generate via AI."""
+        """Generate multiple-choice questions for multiplayer game using AI.
+        
+        All questions are generated fresh for each game to ensure variety and prevent memorization.
+        Uses the new generate_multiplayer_question method for structured JSON responses.
+        """
         questions = []
         questions_per_category = count // len(categories) if categories else count
         remainder = count % len(categories) if categories else 0
@@ -144,73 +148,124 @@ class GameSessionRepository(BaseRepository):
         for i, category in enumerate(categories):
             needed = questions_per_category + (1 if i < remainder else 0)
             
-            # Try fetching from DB
-            db_questions = self.questions_repository.get_random_question_by_filters(
-                category, difficulty, limit=needed
-            )
-            
-            # Format DB questions
-            for q in db_questions:
-                # Ensure options exist (assuming DB questions have them in 'extra' or similar)
-                # If not, we might need to skip or adapt. 
-                # For this implementation, let's assume DB questions are compatible or we skip.
-                # The plan implies we might need to generate if insufficient.
-                
-                # Assuming DB structure matches what we need or we adapt it
-                # If DB question doesn't have options, we might need to generate them or skip
-                # For simplicity, let's assume we use AI if DB question is missing critical fields
-                if "options" in q.get("extra", {}):
-                    questions.append({
-                        "question_text": q["question_text"],
-                        "options": q["extra"]["options"],
-                        "correct_answer": q["extra"].get("correct_answer", ""), # Might need to infer
-                        "category": category,
-                        "difficulty": difficulty,
-                        "keyword": q.get("keyword", "")
-                    })
-            
-            # If we still need questions, generate them
-            while len(questions) < (sum(questions_per_category for _ in range(i)) + needed):
-                # Get random keyword
-                keyword = self.quiz_repository.get_random_keyword(category)
-                if not keyword:
-                    keyword = "general"
-                
-                # Generate question text
+            # Generate questions using AI with structured output
+            for _ in range(needed):
                 try:
-                    # Note: This is a simplified generation. 
-                    # Real implementation would need to parse the AI response to get options/answer
-                    # or use a structured output prompt.
-                    # For now, let's assume generate_question returns a JSON string with options
-                    # or we just use a placeholder for the sake of the plan implementation
+                    # Get random keyword for variety
+                    keyword = self.quiz_repository.get_random_keyword(category)
+                    if not keyword:
+                        keyword = "general"
                     
-                    # The AI service in backend-general returns just text.
-                    # We might need to enhance it or parse it.
-                    # Let's assume we can get a structured question.
-                    
-                    # Since I cannot easily change the AI service prompt structure without affecting backend-general
-                    # (unless I modify the copy), I will assume for this exercise that we can get it.
-                    # Or I can modify the prompt in my copy of ai/prompts.py to ask for JSON.
-                    
-                    # Let's modify the prompt in prompts.py later if needed.
-                    # For now, I'll add a placeholder logic.
-                    
-                    q_text = self.ai_service.generate_question(
-                        category, "General", keyword, difficulty
+                    # Generate structured multiple-choice question
+                    question_data = self.ai_service.generate_multiplayer_question(
+                        category=category,
+                        subcategory="General",  # Could be enhanced to fetch real subcategory
+                        keyword=keyword,
+                        difficulty=difficulty,
+                        style_modifier=None  # Random style could be added here
                     )
                     
-                    # Mocking options for generated question as the current AI service 
-                    # only returns question text, not options.
+                    # Format for game session storage
                     questions.append({
-                        "question_text": q_text,
-                        "options": ["Option A", "Option B", "Option C", "Option D"],
-                        "correct_answer": "Option A",
+                        "question_text": question_data["question"],
+                        "options": question_data["options"],
+                        "correct_answer": question_data["correct_answer"],
                         "category": category,
                         "difficulty": difficulty,
                         "keyword": keyword
                     })
-                except Exception as e:
-                    print(f"Failed to generate question: {e}")
-                    break
                     
-        return questions[:count]
+                except Exception as e:
+                    # Use proper logging instead of print
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(
+                        "question_generation_failed category=%s keyword=%s difficulty=%d error=%s",
+                        category, keyword, difficulty, str(e)
+                    )
+                    # Fail fast - don't return partial results
+                    raise ValueError(
+                        f"Failed to generate question for {category}/{keyword}: {str(e)}"
+                    ) from e
+        
+        # All questions generated successfully
+        return questions
+
+    def fetch_questions_from_list(self, question_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Generate questions from a structured question list.
+        
+        Each entry in question_list should have:
+        - category: Category name
+        - subject: Subject/subcategory name
+        - difficulty: Difficulty level (1-3)
+        - count: Number of questions to generate
+        
+        Args:
+            question_list: List of question set configurations
+            
+        Returns:
+            List of generated question dictionaries
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        all_questions = []
+        
+        for question_set in question_list:
+            category = question_set.get('category')
+            subject = question_set.get('subject', 'General')
+            difficulty = question_set.get('difficulty', 2)
+            count = question_set.get('count', 1)
+            
+            logger.info("generating_questions category=%s subject=%s difficulty=%d count=%d",
+                       category, subject, difficulty, count)
+            
+            # Generate questions for this set
+            for _ in range(count):
+                try:
+                    # Get random keyword for variety
+                    keyword = self.quiz_repository.get_random_keyword(category)
+                    if not keyword:
+                        keyword = "general"
+                    
+                    # Generate structured multiple-choice question with proper subcategory
+                    question_data = self.ai_service.generate_multiplayer_question(
+                        category=category,
+                        subcategory=subject,  # Use the subject as subcategory
+                        keyword=keyword,
+                        difficulty=difficulty,
+                        style_modifier=None
+                    )
+                    
+                    # Format for game session storage
+                    all_questions.append({
+                        "question_text": question_data["question"],
+                        "options": question_data["options"],
+                        "correct_answer": question_data["correct_answer"],
+                        "category": category,
+                        "subject": subject,
+                        "difficulty": difficulty,
+                        "keyword": keyword
+                    })
+                    
+                except Exception as e:
+                    # Fail fast - don't create partial/broken game
+                    logger.error(
+                        "question_generation_failed category=%s subject=%s difficulty=%d "
+                        "generated=%d/%d error=%s",
+                        category, subject, difficulty, len(all_questions), 
+                        sum(qs.get('count', 1) for qs in question_list), str(e)
+                    )
+                    raise ValueError(
+                        f"Failed to generate question for {category}/{subject}: {str(e)}"
+                    ) from e
+        
+        # Validate we generated all expected questions
+        total_expected = sum(qs.get('count', 1) for qs in question_list)
+        if len(all_questions) != total_expected:
+            raise ValueError(
+                f"Generated {len(all_questions)} questions but expected {total_expected}"
+            )
+        
+        logger.info("questions_generated total=%d", len(all_questions))
+        return all_questions

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import boto3
 from openai import OpenAI
@@ -58,3 +58,64 @@ class OpenAIProvider:
 
         api_key = self._resolve_api_key()
         return OpenAI(api_key=api_key)
+
+    def chat_completion(
+        self,
+        model: str,
+        messages: List[Dict[str, str]],
+        max_tokens: int,
+        temperature: Optional[float] = None,
+        response_format: Optional[Dict[str, str]] = None,
+    ) -> Any:
+        """Make a chat completion request with automatic parameter adaptation.
+        
+        Tries with max_tokens first. If the model doesn't support it (newer reasoning
+        models like o1, o3), automatically retries with max_completion_tokens.
+        
+        Args:
+            model: The model name (e.g., 'gpt-4o-mini', 'o1', 'o3-mini')
+            messages: List of message dicts with 'role' and 'content'
+            max_tokens: Maximum tokens for the response
+            temperature: Optional temperature (omitted on retry for reasoning models)
+            response_format: Optional response format (e.g., {"type": "json_object"})
+        
+        Returns:
+            The OpenAI chat completion response object
+        """
+        client = self.get_client()
+        
+        # Build base params
+        params: Dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+        }
+        if temperature is not None:
+            params["temperature"] = temperature
+        if response_format is not None:
+            params["response_format"] = response_format
+        
+        try:
+            return client.chat.completions.create(**params)
+        except Exception as first_error:
+            error_str = str(first_error).lower()
+            # Check if the error is about unsupported max_tokens parameter
+            if "max_tokens" in error_str and "unsupported" in error_str:
+                logger.info(
+                    "chat_completion_retry model=%s reason=max_tokens_unsupported",
+                    model,
+                )
+                # Retry with max_completion_tokens instead
+                # Remove max_tokens and temperature (reasoning models don't support custom temperature)
+                retry_params: Dict[str, Any] = {
+                    "model": model,
+                    "messages": messages,
+                    "max_completion_tokens": max_tokens,
+                }
+                if response_format is not None:
+                    retry_params["response_format"] = response_format
+                
+                return client.chat.completions.create(**retry_params)
+            else:
+                # Not a parameter error, re-raise
+                raise

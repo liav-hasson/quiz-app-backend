@@ -4,7 +4,7 @@ FROM python:3.11-slim as build-stage
 WORKDIR /app
 
 # Install dependencies
-COPY backend/multiplayer/server/requirements.txt .
+COPY multiplayer/server/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Final stage
@@ -17,8 +17,8 @@ COPY --from=build-stage /usr/local/lib/python3.11/site-packages /usr/local/lib/p
 COPY --from=build-stage /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY backend/multiplayer/server/ ./server/
-COPY backend/common/ ./common/
+COPY multiplayer/server/ ./server/
+COPY common/ ./common/
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \
@@ -34,7 +34,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:5001/api/health')"
 
 # Set environment
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app:/app/server
 
 # Run with eventlet worker for WebSocket support
-CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "--bind", "0.0.0.0:5001", "--timeout", "120", "server.app:app"]
+# Use wsgi.py entry point to ensure monkey patching happens before imports
+CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "--bind", "0.0.0.0:5001", "--timeout", "120", "server.wsgi:app"]

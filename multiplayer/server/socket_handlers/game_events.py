@@ -1,214 +1,441 @@
 import time
+import logging
 from flask import current_app
 from flask_socketio import emit
-from server.utils.auth_middleware import socket_authenticated
+from common.redis_client import get_redis_client, EventType
 
-def register_handlers(socketio):
+logger = logging.getLogger(__name__)
+
+# NOTE: Socket handlers for game events are in game_handlers.py
+# This file only contains the start_game_with_countdown function
+# which is called from the Redis event listener.
+
+def start_game_with_countdown(socketio, app, lobby_code, countdown_seconds=3, question_list=None, question_timer=10):
+    """Background task to handle countdown and start game.
     
-    @socketio.on('start_game')
-    @socket_authenticated
-    def handle_start_game(user, data):
-        """
-        Expected data: {
-            "lobby_code": "ABC123"
-        }
-        Only lobby creator can start when all ready
-        """
-        try:
-            lobby_controller = current_app.extensions['lobby_controller']
-            lobby_code = data.get('lobby_code', '').upper()
-            
-            # Validate can start
-            lobby = lobby_controller.validate_game_start(lobby_code, str(user['_id']))
-            
-            # Start countdown
-            emit('countdown_started', {
-                'countdown_duration': current_app.config['GAME_COUNTDOWN_DURATION']
-            }, room=lobby_code)
-            
-            # Schedule game start after countdown
-            socketio.start_background_task(
-                start_game_after_countdown,
-                socketio,
-                current_app._get_current_object(), # Pass app instance
-                lobby_code,
-                current_app.config['GAME_COUNTDOWN_DURATION']
-            )
-            
-        except ValueError as e:
-            emit('error', {'message': str(e)})
-        except Exception as e:
-            emit('error', {'message': f'Failed to start game: {str(e)}'})
-
-    @socketio.on('submit_answer')
-    @socket_authenticated
-    def handle_submit_answer(user, data):
-        """
-        Expected data: {
-            "lobby_code": "ABC123",
-            "answer": "Option A",
-            "time_taken": 5.3  # seconds
-        }
-        """
-        try:
-            game_controller = current_app.extensions['game_controller']
-            lobby_code = data.get('lobby_code', '').upper()
-            answer = data.get('answer')
-            time_taken = data.get('time_taken', 0)
-            
-            # Submit answer (validates, calculates score, records)
-            result = game_controller.submit_answer(
-                lobby_code,
-                str(user['_id']),
-                answer,
-                time_taken
-            )
-            
-            # Emit only to submitting player
-            emit('answer_recorded', {
-                'points_earned': result['points_earned'],
-                'is_correct': result['is_correct'],
-                'time_taken': time_taken
-            })
-            
-            # Optionally emit to room that player answered (without revealing answer)
-            emit('player_answered', {
-                'user_id': str(user['_id']),
-                'username': user['username']
-            }, room=lobby_code, include_self=False)
-            
-        except ValueError as e:
-            emit('error', {'message': str(e)})
-        except Exception as e:
-            emit('error', {'message': f'Failed to submit answer: {str(e)}'})
-
-def start_game_after_countdown(socketio, app, lobby_code, countdown_seconds):
-    """Background task to start game after countdown"""
-    time.sleep(countdown_seconds)
+    This is called from the Redis event listener when GAME_STARTING event is received.
     
+    Args:
+        socketio: SocketIO instance
+        app: Flask app instance
+        lobby_code: Lobby code
+        countdown_seconds: Countdown duration (default 3)
+        question_list: List of question set configurations from lobby
+        question_timer: Time limit for each question in seconds
+    """
     with app.app_context():
         try:
-            game_controller = app.extensions['game_controller']
+            redis_client = get_redis_client()
             
-            # Initialize game (fetch questions, create session)
-            game_session = game_controller.start_game(lobby_code)
+            # Emit countdown_started event
+            socketio.emit('countdown_started', {
+                'seconds': countdown_seconds,
+                'lobby_code': lobby_code
+            }, room=lobby_code, namespace='/')
             
-            # Emit first question
-            emit_next_question(socketio, app, lobby_code)
+            logger.info("game_countdown_started lobby=%s seconds=%d", lobby_code, countdown_seconds)
+            
+            # Wait for countdown
+            time.sleep(countdown_seconds)
+            
+            # Call API to create game session and generate questions
+            import requests
+            import os
+            from common.utils.config import settings
+            
+            internal_secret = os.environ.get("INTERNAL_SERVICE_SECRET")
+            if not internal_secret:
+                raise Exception("INTERNAL_SERVICE_SECRET not configured")
+            
+            api_url = f"http://{settings.api_host}:{settings.api_port}/api/multiplayer/game-session/create"
+            response = requests.post(api_url, json={
+                "lobby_code": lobby_code,
+                "question_list": question_list or []
+            }, headers={
+                "X-Internal-Secret": internal_secret
+            }, timeout=30)
+            
+            if response.status_code != 200:
+                raise Exception(f"API call failed: {response.text}")
+            
+            game_data = response.json()
+            session_id = game_data["session_id"]
+            questions = game_data["questions"]
+            
+            # Get lobby data to initialize player scores
+            lobby_state = redis_client.get_lobby_state(lobby_code) or {}
+            players = lobby_state.get('players', [])
+            
+            # Initialize player scores to 0 for all players
+            player_scores = {str(player.get('user_id', player.get('_id', ''))): 0 for player in players}
+            
+            # Store game session in Redis for fast access
+            redis_client.set_game_state(lobby_code, {
+                "session_id": session_id,
+                "lobby_code": lobby_code,
+                "current_question_index": -1,
+                "total_questions": len(questions),
+                "questions": questions,
+                "status": "in_progress",
+                "question_timer": question_timer,
+                "player_scores": player_scores,  # Initialize scores
+                "player_answers_tracking": {}  # Track which questions each player answered
+            }, ttl_seconds=3600)
+            
+            # Publish GAME_STARTED event via Redis
+            redis_client.publish_lobby_event(
+                lobby_code,
+                EventType.GAME_STARTED,
+                {
+                    "session_id": session_id,
+                    "total_questions": len(questions),
+                    "lobby_code": lobby_code
+                }
+            )
+            
+            logger.info("game_started lobby=%s session=%s questions=%d", 
+                       lobby_code, session_id, len(questions))
+            
+            # Emit initial scores (all players at 0) so leaderboard shows immediately
+            initial_standings = [
+                {
+                    'user_id': str(player.get('user_id', player.get('_id', ''))),
+                    'username': player.get('username', 'Unknown'),
+                    'score': 0
+                }
+                for player in players
+            ]
+            socketio.emit('scores_updated', {
+                'standings': initial_standings
+            }, room=lobby_code, namespace='/')
+            
+            # Start main game loop in a single background task (no concurrent tasks)
+            time.sleep(1)
+            socketio.start_background_task(
+                run_game_loop,
+                socketio,
+                app,
+                lobby_code
+            )
             
         except Exception as e:
+            logger.error("start_game_with_countdown_failed lobby=%s error=%s", lobby_code, str(e), exc_info=True)
             socketio.emit('error', {
                 'message': f'Failed to start game: {str(e)}'
             }, room=lobby_code, namespace='/')
 
-def emit_next_question(socketio, app, lobby_code):
-    """Emit current question to lobby and start timer"""
+def run_game_loop(socketio, app, lobby_code):
+    """Main game loop - runs sequentially through all questions.
+    
+    This runs as a single background task to avoid race conditions from
+    multiple concurrent tasks emitting events out of order.
+    """
     with app.app_context():
         try:
-            game_controller = app.extensions['game_controller']
-            lobby_repository = app.extensions['lobby_repository']
+            redis_client = get_redis_client()
             
-            # Get current question (without correct answer)
-            question_data = game_controller.get_current_question(lobby_code)
-            lobby = lobby_repository.get_lobby_by_code(lobby_code)
-            
-            if not question_data:
-                # Game complete
-                finalize_game(socketio, app, lobby_code)
+            # Get game state from Redis
+            game_state = redis_client.get_game_state(lobby_code)
+            if not game_state:
+                logger.error("game_state_missing lobby=%s", lobby_code)
+                socketio.emit('error', {'message': 'Game state not found'}, room=lobby_code, namespace='/')
                 return
             
-            # Emit question to room
-            socketio.emit('question_started', {
-                'question': question_data,
-                'question_index': question_data['index'],
-                'total_questions': question_data['total'],
-                'timer_duration': lobby['question_timer']
-            }, room=lobby_code, namespace='/')
+            questions = game_state.get('questions', [])
+            question_timer = game_state['question_timer']
             
-            # Schedule auto-advance when timer expires
-            socketio.start_background_task(
-                auto_advance_question,
-                socketio,
-                app,
-                lobby_code,
-                lobby['question_timer']
-            )
+            # Loop through all questions sequentially
+            for question_index in range(len(questions)):
+                try:
+                    # Emit question
+                    question = questions[question_index]
+                    
+                    # CRITICAL: Re-fetch game state to get latest player_scores
+                    # (scores are updated by submit_answer handler during question)
+                    game_state = redis_client.get_game_state(lobby_code)
+                    if not game_state:
+                        logger.error("game_state_lost_mid_game lobby=%s question=%d", lobby_code, question_index)
+                        raise RuntimeError("Game state lost during game")
+                    
+                    # Log current scores for debugging
+                    current_scores = game_state.get('player_scores', {})
+                    logger.info("question_start_scores lobby=%s question=%d scores=%s", 
+                               lobby_code, question_index + 1, current_scores)
+                    
+                    # Update current question index in Redis
+                    game_state['current_question_index'] = question_index
+                    game_state['current_question'] = question
+                    redis_client.set_game_state(lobby_code, game_state, ttl_seconds=3600)
+                    
+                    # Publish QUESTION_SENT event
+                    redis_client.publish_lobby_event(
+                        lobby_code,
+                        EventType.QUESTION_SENT,
+                        {
+                            "question": question['question_text'],
+                            "options": question['options'],
+                            "category": question.get('category', 'General'),
+                            "difficulty": question.get('difficulty', 2),
+                            "question_number": question_index + 1,
+                            "total_questions": len(questions),
+                            "time_limit": question_timer
+                        }
+                    )
+                    
+                    logger.info("question_emitted lobby=%s question=%d/%d", 
+                               lobby_code, question_index + 1, len(questions))
+                    
+                    # Wait for timer to expire OR all players to answer
+                    # Check every 0.5 seconds if all players have answered
+                    elapsed = 0
+                    check_interval = 0.5
+                    
+                    # Get player count from lobby
+                    lobby_state = redis_client.get_lobby_state(lobby_code) or {}
+                    player_count = len(lobby_state.get('players', []))
+                    
+                    while elapsed < question_timer:
+                        time.sleep(check_interval)
+                        elapsed += check_interval
+                        
+                        # Check if all players have answered
+                        current_state = redis_client.get_game_state(lobby_code)
+                        if current_state:
+                            player_answers = current_state.get('player_answers', {})
+                            # Count players who answered THIS question
+                            answered_count = sum(
+                                1 for user_answers in player_answers.values()
+                                if any(a.get('question_index') == question_index for a in user_answers)
+                            )
+                            
+                            if answered_count >= player_count and player_count > 0:
+                                logger.info("all_players_answered lobby=%s question=%d elapsed=%.1f", 
+                                           lobby_code, question_index + 1, elapsed)
+                                break
+                    
+                    # End question and show results
+                    end_current_question(socketio, app, lobby_code, question_index)
+                    
+                    # Wait 3 seconds to show results before next question
+                    time.sleep(3)
+                    
+                except Exception as e:
+                    logger.error("question_loop_error lobby=%s question=%d error=%s", 
+                               lobby_code, question_index + 1, str(e), exc_info=True)
+                    # Continue to next question even if one fails
+            
+            # All questions complete - finalize game
+            logger.info("game_questions_complete lobby=%s", lobby_code)
+            finalize_game(socketio, app, lobby_code)
             
         except Exception as e:
+            logger.error("game_loop_failed lobby=%s error=%s", lobby_code, str(e), exc_info=True)
             socketio.emit('error', {
-                'message': f'Failed to emit question: {str(e)}'
+                'message': f'Game loop failed: {str(e)}'
             }, room=lobby_code, namespace='/')
 
-def auto_advance_question(socketio, app, lobby_code, timer_duration):
-    """Auto-advance to next question when timer expires"""
-    time.sleep(timer_duration)
+def end_current_question(socketio, app, lobby_code, question_index):
+    """End the current question - record auto-fails and emit results.
     
+    Called from the main game loop after timer expires.
+    """
     with app.app_context():
         try:
-            game_controller = app.extensions['game_controller']
-            lobby_repository = app.extensions['lobby_repository']
+            import requests
+            import os
+            from common.utils.config import settings
+            
+            redis_client = get_redis_client()
+            
+            # Get game state
+            game_state = redis_client.get_game_state(lobby_code)
+            if not game_state:
+                logger.error("game_state_missing_end_question lobby=%s", lobby_code)
+                return
+            
+            questions = game_state.get('questions', [])
+            player_answers_tracking = game_state.get('player_answers_tracking', {})
+            
+            # Get lobby data
+            internal_secret = os.environ.get("INTERNAL_SERVICE_SECRET")
+            if not internal_secret:
+                logger.error("INTERNAL_SERVICE_SECRET not configured")
+                return
+            
+            api_url = f"http://{settings.api_host}:{settings.api_port}/api/multiplayer/lobby/{lobby_code}"
+            lobby_response = requests.get(api_url, headers={
+                "X-Internal-Secret": internal_secret
+            }, timeout=5)
+            
+            if lobby_response.status_code != 200:
+                logger.error("failed_to_get_lobby lobby=%s", lobby_code)
+                return
+            
+            lobby = lobby_response.json().get('lobby')
+            if not lobby:
+                logger.error("lobby_missing lobby=%s", lobby_code)
+                return
             
             # Record auto-fail for players who didn't answer
-            session = game_controller.game_session_repository.get_game_session_by_lobby(lobby_code)
-            lobby = lobby_repository.get_lobby_by_code(lobby_code)
-            current_index = session['current_question_index']
+            api_url = f"http://{settings.api_host}:{settings.api_port}/api/multiplayer/game-action/record-auto-fail"
             
-            for player in lobby['players']:
+            for player in lobby.get('players', []):
                 user_id = player['user_id']
+                player_answered_indices = player_answers_tracking.get(user_id, [])
                 
-                # Check if player answered this question
-                player_answers = session['player_answers'].get(user_id, [])
-                answered_indices = [a['question_index'] for a in player_answers]
+                if question_index not in player_answered_indices:
+                    try:
+                        requests.post(api_url, json={
+                            "lobby_code": lobby_code,
+                            "user_id": user_id,
+                            "question_index": question_index
+                        }, headers={
+                            "X-Internal-Secret": internal_secret
+                        }, timeout=5)
+                        logger.debug("auto_fail_recorded lobby=%s user=%s question=%d", 
+                                   lobby_code, user_id, question_index)
+                    except Exception as e:
+                        logger.warning("auto_fail_request_failed user=%s error=%s", user_id, str(e))
+            
+            # Get updated scores and correct answer
+            correct_answer = questions[question_index].get('correct_answer', '')
+            
+            # Build standings with username for leaderboard display
+            # Use scores from Redis game state (more up-to-date than MongoDB)
+            # Refresh game state to get latest player_scores after answer submissions
+            game_state = redis_client.get_game_state(lobby_code) or game_state
+            player_scores = game_state.get('player_scores', {})
+            player_answers = game_state.get('player_answers', {})
+            
+            standings = []
+            for player in lobby.get('players', []):
+                user_id = player['user_id']
+                # Count correct answers for this player
+                user_answers = player_answers.get(user_id, [])
+                correct_count = sum(1 for a in user_answers if a.get('is_correct', False))
                 
-                if current_index not in answered_indices:
-                    # Auto-record wrong answer with 0 points
-                    game_controller.record_auto_fail(lobby_code, user_id, current_index)
-
-            # Get correct answer and current scores
-            question_results = game_controller.get_question_results(lobby_code)
+                standings.append({
+                    "user_id": user_id,
+                    "username": player['username'],
+                    "score": player_scores.get(user_id, 0),
+                    "correct_answers": correct_count
+                })
             
-            # Emit question ended with results
-            socketio.emit('question_ended', {
-                'correct_answer': question_results['correct_answer'],
-                'player_scores': question_results['player_scores'],
-                'player_answers': question_results['player_answers']
-            }, room=lobby_code, namespace='/')
+            # Sort by score descending
+            standings.sort(key=lambda x: x['score'], reverse=True)
             
-            # Wait interval before next question
-            time.sleep(app.config['QUESTION_INTERVAL_DURATION'])
+            # Publish ROUND_ENDED event
+            redis_client.publish_lobby_event(
+                lobby_code,
+                EventType.ROUND_ENDED,
+                {
+                    "correct_answer": correct_answer,
+                    "standings": standings
+                }
+            )
             
-            # Advance to next question
-            has_next = game_controller.advance_to_next_question(lobby_code)
+            # Publish SCORES_UPDATED event
+            redis_client.publish_lobby_event(
+                lobby_code,
+                EventType.SCORES_UPDATED,
+                {
+                    "standings": standings
+                }
+            )
             
-            if has_next:
-                emit_next_question(socketio, app, lobby_code)
-            else:
-                finalize_game(socketio, app, lobby_code)
+            logger.info("question_ended lobby=%s correct_answer=%s", 
+                       lobby_code, correct_answer)
             
         except Exception as e:
-            socketio.emit('error', {
-                'message': f'Failed to advance question: {str(e)}'
-            }, room=lobby_code, namespace='/')
+            logger.error("end_question_failed lobby=%s question=%d error=%s", 
+                        lobby_code, question_index, str(e), exc_info=True)
+
+
 
 def finalize_game(socketio, app, lobby_code):
-    """Finalize game, award XP, emit results"""
+    """Finalize game, calculate final scores, award XP, and emit results."""
     with app.app_context():
         try:
-            game_controller = app.extensions['game_controller']
+            import requests
+            import os
+            from common.utils.config import settings
             
-            # Calculate final scores and award XP
-            results = game_controller.finalize_game(lobby_code)
+            redis_client = get_redis_client()
             
-            # Emit game ended
-            socketio.emit('game_ended', {
-                'final_rankings': results['rankings'],
-                'xp_awarded': results['xp_awarded']
-            }, room=lobby_code, namespace='/')
+            # Get final player scores from lobby via API (updated real-time during game)
+            internal_secret = os.environ.get("INTERNAL_SERVICE_SECRET")
+            if not internal_secret:
+                logger.error("INTERNAL_SERVICE_SECRET not configured")
+                return
             
-            # Schedule lobby cleanup (optional)
-            # socketio.start_background_task(cleanup_lobby, lobby_code, 300)
+            api_url = f"http://{settings.api_host}:{settings.api_port}/api/multiplayer/lobby/{lobby_code}"
+            lobby_response = requests.get(api_url, headers={
+                "X-Internal-Secret": internal_secret
+            }, timeout=5)
+            
+            if lobby_response.status_code != 200:
+                logger.error("failed_to_get_lobby_finalize lobby=%s", lobby_code)
+                return
+            
+            lobby = lobby_response.json().get('lobby')
+            
+            if not lobby:
+                logger.error("lobby_not_found_finalize lobby=%s", lobby_code)
+                return
+            
+            # Get final scores from Redis (most up-to-date), not MongoDB
+            game_state = redis_client.get_game_state(lobby_code)
+            player_scores = game_state.get('player_scores', {}) if game_state else {}
+            player_answers = game_state.get('player_answers', {}) if game_state else {}
+            
+            # Fallback to MongoDB if Redis has no scores
+            if not player_scores:
+                player_scores = {p['user_id']: p.get('score', 0) for p in lobby.get('players', [])}
+            
+            # Build correct_answers map
+            correct_answers_map = {}
+            for user_id, answers in player_answers.items():
+                correct_answers_map[user_id] = sum(1 for a in answers if a.get('is_correct', False))
+            
+            # Call API to finalize game and award XP
+            internal_secret = os.environ.get("INTERNAL_SERVICE_SECRET")
+            if not internal_secret:
+                logger.error("INTERNAL_SERVICE_SECRET not configured")
+                return
+            
+            api_url = f"http://{settings.api_host}:{settings.api_port}/api/multiplayer/game-action/finalize"
+            response = requests.post(api_url, json={
+                "lobby_code": lobby_code,
+                "player_scores": player_scores,
+                "correct_answers": correct_answers_map
+            }, headers={
+                "X-Internal-Secret": internal_secret
+            }, timeout=10)
+            
+            if response.status_code != 200:
+                logger.error("finalize_api_failed lobby=%s status=%d", lobby_code, response.status_code)
+                return
+            
+            results = response.json()
+            
+            logger.info("game_finalized lobby=%s winner=%s", 
+                       lobby_code, results['rankings'][0]['username'] if results.get('rankings') else 'none')
+            
+            # Publish GAME_ENDED event via Redis
+            redis_client.publish_lobby_event(
+                lobby_code,
+                EventType.GAME_ENDED,
+                {
+                    "final_standings": results.get('rankings', []),
+                    "xp_awarded": results.get('xp_awarded', {})
+                }
+            )
+            
+            logger.info("game_ended_event_published lobby=%s", lobby_code)
             
         except Exception as e:
+            logger.error("finalize_game_failed lobby=%s error=%s", 
+                        lobby_code, str(e), exc_info=True)
             socketio.emit('error', {
                 'message': f'Failed to finalize game: {str(e)}'
             }, room=lobby_code, namespace='/')

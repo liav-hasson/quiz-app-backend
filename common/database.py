@@ -72,20 +72,43 @@ class DBController:
             )
         return f"mongodb://{self.host}:{self.port}/"
 
-    def connect(self) -> bool:
-        """Connect to MongoDB and verify the connection."""
-
-        try:
-            self.client = pymongo.MongoClient(self._build_connection_string())
-            self.db = self.client[self.db_name]
-            self.client.admin.command("ping")
-            logger.info("Connected to MongoDB successfully")
-            return True
-        except Exception as exc:  # pragma: no cover - best effort logging
-            logger.error("Failed to connect to MongoDB: %s", exc, exc_info=True)
-            self.client = None
-            self.db = None
-            return False
+    def connect(self, max_retries: int = 3, retry_delay: int = 2) -> bool:
+        """Connect to MongoDB and verify the connection with retries.
+        
+        Args:
+            max_retries: Maximum number of connection attempts
+            retry_delay: Seconds to wait between retries
+        """
+        import time
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                self.client = pymongo.MongoClient(
+                    self._build_connection_string(),
+                    serverSelectionTimeoutMS=5000,
+                    connectTimeoutMS=5000,
+                    socketTimeoutMS=5000,
+                    connect=False  # Lazy connection - avoid eventlet issues
+                )
+                self.db = self.client[self.db_name]
+                self.client.admin.command("ping")
+                logger.info("Connected to MongoDB successfully on attempt %d/%d", attempt, max_retries)
+                return True
+            except Exception as exc:  # pragma: no cover - best effort logging
+                logger.warning(
+                    "Failed to connect to MongoDB (attempt %d/%d): %s",
+                    attempt, max_retries, exc
+                )
+                self.client = None
+                self.db = None
+                if attempt < max_retries:
+                    logger.info("Retrying in %d seconds...", retry_delay)
+                    time.sleep(retry_delay)
+                else:
+                    logger.error("Failed to connect to MongoDB after %d attempts", max_retries)
+                    return False
+        
+        return False
 
     def disconnect(self) -> None:
         """Disconnect from MongoDB."""

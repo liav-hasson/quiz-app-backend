@@ -33,6 +33,7 @@ from common.repositories.user_repository import UserRepository
 from common.repositories.questions_repository import QuestionsRepository
 from common.repositories.leaderboard_repository import LeaderboardRepository
 from common.repositories.quiz_repository import QuizRepository
+from common.repositories.lobby_repository import LobbyRepository
 from models.data_migrator import DataMigrator
 from common.utils.identity import TokenService, GoogleTokenVerifier
 
@@ -41,6 +42,7 @@ from routes.health_routes import health_bp, init_health_routes
 from routes.quiz_routes import quiz_bp, init_quiz_routes
 from routes.auth_routes import auth_bp, init_auth_routes
 from routes.user_activity_routes import user_activity_bp, init_user_activity_routes
+from routes.multiplayer_routes import multiplayer_bp, init_multiplayer_routes
 
 # Configure logging
 logging.basicConfig(
@@ -71,6 +73,12 @@ def initialize_database(app: Flask) -> bool:
         user_repository = UserRepository(db_controller)
         questions_repository = QuestionsRepository(db_controller)
         leaderboard_repository = LeaderboardRepository(db_controller)
+        lobby_repository = LobbyRepository(db_controller)
+
+        # Ensure MongoDB indexes are created for lobbies
+        # This creates: unique index on lobby_code, TTL index on expire_at
+        lobby_repository.ensure_indexes()
+        logger.info("Lobby indexes ensured")
 
         # Identity helpers
         token_service = TokenService()
@@ -125,6 +133,7 @@ def initialize_database(app: Flask) -> bool:
         app.extensions["user_repository"] = user_repository
         app.extensions["questions_repository"] = questions_repository
         app.extensions["leaderboard_repository"] = leaderboard_repository
+        app.extensions["lobby_repository"] = lobby_repository
         app.extensions["token_service"] = token_service
         app.extensions["google_token_verifier"] = google_token_verifier
         app.extensions["oauth"] = oauth
@@ -176,11 +185,16 @@ def initialize_routes(app: Flask) -> None:
         user_activity_controller,
     )
 
+    # Initialize multiplayer routes
+    lobby_repository = app.extensions["lobby_repository"]
+    init_multiplayer_routes(lobby_repository, quiz_repository)
+
     # Register blueprints
     app.register_blueprint(health_bp)
     app.register_blueprint(quiz_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(user_activity_bp)
+    app.register_blueprint(multiplayer_bp)
 
     logger.info("All routes registered successfully")
 
@@ -195,6 +209,12 @@ def setup_middleware(app: Flask) -> None:
     @app.before_request
     def authenticate_request() -> Optional[tuple]:
         """Authenticate requests using JWT Bearer tokens."""
+        # DEBUG LOGGING
+        print(f"DEBUG: authenticate_request method={request.method} path={request.path}", flush=True)
+
+        # Always allow OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
+            return None
 
         exempt_paths = (
             "/api/health",
@@ -203,6 +223,8 @@ def setup_middleware(app: Flask) -> None:
             "/api/categories",
             "/api/subjects",
             "/api/all-subjects",
+            "/api/multiplayer/game-session/create",  # Internal service-to-service (has X-Internal-Secret check)
+            "/api/multiplayer/game-action/",  # Internal game action endpoints (has X-Internal-Secret check)
         )
 
         if current_app.config.get("TESTING"):
@@ -217,6 +239,12 @@ def setup_middleware(app: Flask) -> None:
         if any(request.path.startswith(path) for path in exempt_paths):
             logger.info("auth_middleware_exempt path=%s", request.path)
             return None
+
+        # Special exemption for GET /api/multiplayer/lobby/<id> (Public details)
+        # But POST/PUT/PATCH to /api/multiplayer/lobby/... must be authenticated
+        if request.path.startswith("/api/multiplayer/lobby/") and request.method == "GET":
+             logger.info("auth_middleware_exempt_lobby_get path=%s", request.path)
+             return None
 
         # Get dependencies from app extensions (thread-safe)
         user_repository = current_app.extensions.get("user_repository")
@@ -348,8 +376,8 @@ def create_app() -> Flask:
     CORS(app, resources={
         r"/api/*": {
             "origins": "*",
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"],
+            "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "X-OpenAI-API-Key", "X-OpenAI-Model"],
             "expose_headers": ["Content-Type", "Authorization"],
             "supports_credentials": True
         }
