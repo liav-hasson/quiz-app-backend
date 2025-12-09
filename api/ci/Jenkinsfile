@@ -103,7 +103,7 @@ pipeline {
                     }
 
                     // Compute semantic version (script will fail if no tag exists)
-                    def semver = sh(returnStdout: true, script: './backend/api/scripts/compute_next_version.sh . auto').trim()
+                    def semver = sh(returnStdout: true, script: './api/scripts/compute_next_version.sh . auto').trim()
                     echo "Computed semantic version: ${semver}"
                     
                     // Add -dev suffix with git SHA for non-main branches to ensure unique tags
@@ -310,7 +310,7 @@ pipeline {
                                                       usernameVariable: 'GIT_USERNAME', 
                                                       passwordVariable: 'GIT_PASSWORD')]) {
                         sh '''
-                            ./backend/api/scripts/update-gitops.sh \
+                            ./api/scripts/update-gitops.sh \
                                 "${DOCKERHUB_CREDENTIALS_USR}" \
                                 "${DOCKER_IMAGE_NAME}" \
                                 "${IMAGE_TAG}" \
