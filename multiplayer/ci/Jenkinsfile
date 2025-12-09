@@ -103,7 +103,7 @@ pipeline {
                     }
 
                     // Compute semantic version (script will fail if no tag exists)
-                    def semver = sh(returnStdout: true, script: './scripts/compute_next_version.sh . auto').trim()
+                    def semver = sh(returnStdout: true, script: './backend/multiplayer/scripts/compute_next_version.sh . auto').trim()
                     echo "Computed semantic version: ${semver}"
                     
                     // Set build version
@@ -325,8 +325,8 @@ pipeline {
                     // Run the update script
                     // It clones the GitOps repo, updates values.yaml/Chart.yaml, and pushes changes
                     sh """
-                        chmod +x ./scripts/update-gitops.sh
-                        ./scripts/update-gitops.sh \
+                        chmod +x ./backend/multiplayer/scripts/update-gitops.sh
+                        ./backend/multiplayer/scripts/update-gitops.sh \
                             "${DOCKERHUB_CREDENTIALS_USR}" \
                             "${DOCKER_IMAGE_NAME}" \
                             "${IMAGE_TAG}" \
