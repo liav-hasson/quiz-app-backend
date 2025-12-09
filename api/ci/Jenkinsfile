@@ -391,6 +391,7 @@ pipeline {
 
     post {
         always {
+            // send slack message
             script {
                 def buildResult = currentBuild.result ?: 'SUCCESS'
                 def statusIcon = buildResult == "SUCCESS" ? "✅" : "❌"
