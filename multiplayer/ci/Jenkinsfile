@@ -59,24 +59,24 @@ pipeline {
         GIT_USER_NAME         = "Jenkins Pipeline"
         GIT_USER_EMAIL        = "jenkins@weatherlabs.org"
 
-        // Application layout
-        APP_DIR               = "backend/multiplayer/server"
-        PYTHON_SRC_DIR        = "backend/multiplayer/server"
-        REQUIREMENTS_FILE     = "backend/multiplayer/server/requirements.txt"
+        // Application layout (relative to repo root)
+        APP_DIR               = "multiplayer/server"
+        PYTHON_SRC_DIR        = "multiplayer/server"
+        REQUIREMENTS_FILE     = "multiplayer/server/requirements.txt"
 
         // Docker image name without registry/user prefix (application)
         DOCKER_IMAGE_NAME     = "quiz-multiplayer"
 
         // CI resources directory
-        CI_DIR                = "backend/multiplayer/ci"
+        CI_DIR                = "multiplayer/ci"
     }
 
     stages {
         stage('Prepare image version') {
             when {
                 anyOf {
-                    changeset "backend/multiplayer/**"
-                    changeset "backend/common/**"
+                    changeset "multiplayer/**"
+                    changeset "common/**"
                     triggeredBy 'UserIdCause'
                 }
             }
@@ -116,8 +116,8 @@ pipeline {
         stage('Testing stage') {
             when {
                 anyOf {
-                    changeset "backend/multiplayer/**"
-                    changeset "backend/common/**"
+                    changeset "multiplayer/**"
+                    changeset "common/**"
                     triggeredBy 'UserIdCause'
                 }
             }
@@ -130,11 +130,11 @@ pipeline {
                         # Run pylint on all Python source files recursively with proper PYTHONPATH
                         echo "Running pylint on Python source files..."
                         
-                        # Set PYTHONPATH to server directory so imports resolve correctly
-                        export PYTHONPATH="${WORKSPACE}/server"
+                        # Set PYTHONPATH to include repo root (for common module) and server directory
+                        export PYTHONPATH="${WORKSPACE}:${WORKSPACE}/multiplayer/server"
                         
                         # Run pylint recursively on entire server directory
-                        pylint server/ --score=yes --fail-under=5.0 --disable=C0103,E0401 --recursive=y || {
+                        pylint multiplayer/server/ --score=yes --fail-under=5.0 --disable=C0103,E0401 --recursive=y || {
                             echo "Pylint checks failed!"
                             exit 1
                         }
@@ -146,9 +146,9 @@ pipeline {
                         # Run pytest with proper PYTHONPATH on all test files
                         echo "Running pytest on complete test suite..."
                         
-                        export PYTHONPATH="${WORKSPACE}/server"
+                        export PYTHONPATH="${WORKSPACE}:${WORKSPACE}/multiplayer/server"
                         
-                        cd server
+                        cd multiplayer/server
                         pytest tests/ --tb=short -v || {
                             echo "Tests failed!"
                             exit 1
@@ -183,8 +183,8 @@ pipeline {
         stage('Python Static Security Analysis') {
             when {
                 anyOf {
-                    changeset "backend/multiplayer/**"
-                    changeset "backend/common/**"
+                    changeset "multiplayer/**"
+                    changeset "common/**"
                     triggeredBy 'UserIdCause'
                 }
             }
@@ -222,8 +222,8 @@ pipeline {
         stage('Dockerfile Security Scan') {
             when {
                 anyOf {
-                    changeset "backend/multiplayer/**"
-                    changeset "backend/common/**"
+                    changeset "multiplayer/**"
+                    changeset "common/**"
                     triggeredBy 'UserIdCause'
                 }
             }
@@ -262,8 +262,8 @@ pipeline {
         stage('Build Docker Image') {
             when {
                 anyOf {
-                    changeset "backend/multiplayer/**"
-                    changeset "backend/common/**"
+                    changeset "multiplayer/**"
+                    changeset "common/**"
                     triggeredBy 'UserIdCause'
                 }
             }
@@ -286,8 +286,8 @@ pipeline {
         stage('Push Docker Image') {
             when {
                 anyOf {
-                    changeset "backend/multiplayer/**"
-                    changeset "backend/common/**"
+                    changeset "multiplayer/**"
+                    changeset "common/**"
                     triggeredBy 'UserIdCause'
                 }
             }
@@ -313,8 +313,8 @@ pipeline {
         stage('Update GitOps') {
             when {
                 anyOf {
-                    changeset "backend/multiplayer/**"
-                    changeset "backend/common/**"
+                    changeset "multiplayer/**"
+                    changeset "common/**"
                     triggeredBy 'UserIdCause'
                 }
             }
