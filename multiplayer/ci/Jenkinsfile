@@ -106,9 +106,18 @@ pipeline {
                     def semver = sh(returnStdout: true, script: './multiplayer/scripts/compute_next_version.sh . auto').trim()
                     echo "Computed semantic version: ${semver}"
                     
-                    // Set build version
-                    env.IMAGE_TAG = "${semver}"
-                    currentBuild.displayName = "${semver} #${BUILD_NUMBER}"
+                    // Add -dev suffix with git SHA for non-main branches to ensure unique tags
+                    if (env.DEPLOY_ENV == 'dev') {
+                        def gitSha = sh(returnStdout: true, script: 'git rev-parse --short=8 HEAD').trim()
+                        env.IMAGE_TAG = "${semver}-dev-${gitSha}"
+                        echo "Added -dev suffix with git SHA for dev environment: ${gitSha}"
+                    } else {
+                        env.IMAGE_TAG = semver
+                    }
+                    
+                    echo "Final image tag: ${env.IMAGE_TAG}"
+                    echo "Deploy environment: ${env.DEPLOY_ENV}"
+                    currentBuild.displayName = "${env.IMAGE_TAG} #${BUILD_NUMBER}"
                 }
             }
         }
@@ -271,46 +280,55 @@ pipeline {
                 script {
                     echo '--------- Building Docker Image ---------'
                     
-                    // Build Docker image
-                    // We use the Dockerfile in ci/app-dockerfile/Dockerfile
-                    // Context is the root of the repo (.)
-                    sh """
-                        docker build \
-                        -t ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG} \
-                        -f ${CI_DIR}/app-dockerfile/Dockerfile .
-                    """
+                    sh '''
+                        echo "Connecting to BuildKit DaemonSet..."
+                        export BUILDKIT_HOST=tcp://buildkitd.jenkins.svc.cluster.local:1234
+
+                        echo "Building ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG} with buildctl..."
+                        buildctl --addr ${BUILDKIT_HOST} build \
+                            --frontend dockerfile.v0 \
+                            --local context=. \
+                            --local dockerfile=${CI_DIR}/app-dockerfile \
+                            --output type=image,name=${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG},push=true
+
+                        echo "Image ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG} built and pushed"
+                    '''
                 }
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Push Latest Tag') {
             when {
-                anyOf {
-                    changeset "multiplayer/**"
-                    changeset "common/**"
-                    triggeredBy 'UserIdCause'
-                }
-            }
-            steps {
-                script {
-                    echo '--------- Pushing Docker Image ---------'
-                    
-                    // Login to Docker Hub
-                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
-                    
-                    // Push image
-                    sh "docker push ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
-                    
-                    // Also push 'latest' tag if on main branch
-                    if (env.BRANCH_NAME == 'main') {
-                        sh "docker tag ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG} ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:latest"
-                        sh "docker push ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:latest"
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset "multiplayer/**"
+                        changeset "common/**"
+                        triggeredBy 'UserIdCause'
                     }
                 }
             }
+            steps {
+                script {
+                    echo '--------- Pushing Latest Tag ---------'
+                    
+                    sh '''
+                        export BUILDKIT_HOST=tcp://buildkitd.jenkins.svc.cluster.local:1234
+                        
+                        # Tag and push latest
+                        buildctl --addr ${BUILDKIT_HOST} build \
+                            --frontend dockerfile.v0 \
+                            --local context=. \
+                            --local dockerfile=${CI_DIR}/app-dockerfile \
+                            --output type=image,name=${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:latest,push=true
+                        
+                        echo "Pushed ${DOCKERHUB_CREDENTIALS_USR}/${DOCKER_IMAGE_NAME}:latest"
+                    '''
+                }
+            }
         }
 
-        stage('Update GitOps') {
+        stage('Update GitOps Repository') {
             when {
                 anyOf {
                     changeset "multiplayer/**"
@@ -319,25 +337,87 @@ pipeline {
                 }
             }
             steps {
+                echo '--------- Updating GitOps Repository ---------'
                 script {
-                    echo '--------- Updating GitOps Repository ---------'
-                    
-                    // Run the update script
-                    // It clones the GitOps repo, updates values.yaml/Chart.yaml, and pushes changes
-                    sh """
-                        chmod +x ./multiplayer/scripts/update-gitops.sh
-                        ./multiplayer/scripts/update-gitops.sh \
-                            "${DOCKERHUB_CREDENTIALS_USR}" \
-                            "${DOCKER_IMAGE_NAME}" \
-                            "${IMAGE_TAG}" \
-                            "${BUILD_NUMBER}" \
-                            "${GITOPS_REPO_URL}" \
-                            "${GIT_USER_NAME}" \
-                            "${GIT_USER_EMAIL}" \
-                            "${GITHUB_CREDENTIALS_USR}" \
-                            "${GITHUB_CREDENTIALS_PSW}" \
-                            "${DEPLOY_ENV}"
-                    """
+                    // Use github-credentials which should contain the PAT
+                    withCredentials([usernamePassword(credentialsId: 'github-credentials', 
+                                                      usernameVariable: 'GIT_USERNAME', 
+                                                      passwordVariable: 'GIT_PASSWORD')]) {
+                        sh '''
+                            ./multiplayer/scripts/update-gitops.sh \
+                                "${DOCKERHUB_CREDENTIALS_USR}" \
+                                "${DOCKER_IMAGE_NAME}" \
+                                "${IMAGE_TAG}" \
+                                "${BUILD_NUMBER}" \
+                                "${GITOPS_REPO_URL}" \
+                                "${GIT_USER_NAME}" \
+                                "${GIT_USER_EMAIL}" \
+                                "${GIT_USERNAME}" \
+                                "${GIT_PASSWORD}" \
+                                "${DEPLOY_ENV}"
+                        '''
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "✅ GitOps repository updated successfully"
+                    echo "Environment: ${env.DEPLOY_ENV}"
+                    echo "ArgoCD will detect changes and deploy automatically"
+                }
+                failure {
+                    echo "❌ Failed to update GitOps repository"
+                }
+            }
+        }
+
+        stage('Tag Application Release') {
+            when {
+                allOf {
+                    expression { env.DEPLOY_ENV == 'prod' }
+                    anyOf {
+                        changeset "multiplayer/**"
+                        changeset "common/**"
+                        triggeredBy 'UserIdCause'
+                    }
+                }
+            }
+            steps {
+                echo '--------- Tagging Application Release ---------'
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'github-credentials',
+                                                      usernameVariable: 'GIT_USERNAME',
+                                                      passwordVariable: 'GIT_PASSWORD')]) {
+                        sh '''
+                            # Configure git
+                            git config user.name "${GIT_USER_NAME}"
+                            git config user.email "${GIT_USER_EMAIL}"
+                            
+                            # Create annotated tag
+                            git tag -a "${IMAGE_TAG}" -m "Release ${IMAGE_TAG} - Build #${BUILD_NUMBER}" || {
+                                echo "Tag ${IMAGE_TAG} already exists locally"
+                            }
+                            
+                            # Build authenticated URL
+                            REPO_PATH=$(echo "${GITHUB_REPO_URL}" | sed 's|https://||')
+                            AUTHENTICATED_URL="https://${GIT_USERNAME}:${GIT_PASSWORD}@${REPO_PATH}"
+                            
+                            # Push tag to remote
+                            git push "${AUTHENTICATED_URL}" "${IMAGE_TAG}" || {
+                                echo "Tag ${IMAGE_TAG} already exists on remote"
+                            }
+                            
+                            echo "Tagged application repo with ${IMAGE_TAG}"
+                        '''
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "✅ Application tagged with version ${env.IMAGE_TAG}"
+                }
+                failure {
+                    echo "❌ Failed to tag application release"
                 }
             }
         }
@@ -345,13 +425,47 @@ pipeline {
 
     post {
         always {
-            cleanWs()
-        }
-        success {
-            echo "Pipeline completed successfully. Deployed version ${IMAGE_TAG} to ${DEPLOY_ENV}."
-        }
-        failure {
-            echo "Pipeline failed."
+            // send slack message
+            script {
+                def buildResult = currentBuild.result ?: 'SUCCESS'
+                def statusIcon = buildResult == "SUCCESS" ? "✅" : "❌"
+                def color = buildResult == "SUCCESS" ? "good" : "danger"
+                def slackMessage = buildResult == "SUCCESS" ? 
+                    "✅ GitOps update completed! Sync ArgoCD to deploy!" : 
+                    "❌ Pipeline failed - check logs for details"
+                def finalMessage = [
+                    "${statusIcon} GitOps Pipeline *${env.JOB_NAME}* #${env.BUILD_NUMBER} ${buildResult}",
+                    "",
+                    "*Environment:* ${env.DEPLOY_ENV?.toUpperCase() ?: 'UNKNOWN'}",
+                    "*Branch:* ${env.BRANCH_NAME}",
+                    "*Docker Image:* ${env.DOCKERHUB_CREDENTIALS_USR}/${env.DOCKER_IMAGE_NAME}:${env.IMAGE_TAG}",
+                    "${slackMessage}"
+                ].join('\n')
+
+                slackSend(
+                    channel: '#jenkins',
+                    color: color,
+                    message: finalMessage
+                )
+            }
+
+            // Report status back to GitHub using Commit Status API
+            script {
+                def buildResult = currentBuild.result ?: 'SUCCESS'
+                def status = buildResult == "SUCCESS" ? "success" : "failure"
+                def description = buildResult == "SUCCESS" ? 
+                    "Jenkins build passed" : 
+                    "Jenkins build failed"
+                    
+                sh """
+                    curl -X POST \
+                        -H "Authorization: token \${GITHUB_TOKEN}" \
+                        -H "Accept: application/vnd.github.v3+json" \
+                        -H "Content-Type: application/json" \
+                        -d '{"state":"${status}","target_url":"${BUILD_URL}","description":"${description}","context":"continuous-integration/jenkins"}' \
+                        "https://api.github.com/repos/${GITHUB_REPO}/statuses/${env.GIT_COMMIT}"
+                """
+            }
         }
     }
 }
