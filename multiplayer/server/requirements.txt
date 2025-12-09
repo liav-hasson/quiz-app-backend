@@ -1,17 +1,26 @@
+# Core Flask
 Flask==3.0.0
-flask-cors==4.0.0
+flask-cors==6.0.0
 flask-socketio==5.3.5
-python-socketio==5.10.0
-pymongo==4.6.1
+python-socketio==5.14.0
 PyJWT==2.8.0
 python-dotenv==1.0.0
-gunicorn==21.2.0
-eventlet==0.33.3
+
+# Database
+pymongo==4.15.5
 redis==5.0.1
-prometheus-flask-exporter==0.23.0
-requests==2.31.0
+
+# Server
+gunicorn==23.0.0
+eventlet==0.40.3
+
+# HTTP/Auth
+requests==2.32.4
 boto3==1.34.0
-openai>=2.0.0
 google-auth==2.34.0
-pytz>=2024.1
 authlib==1.6.5
+
+# AI/Utilities
+openai>=2.0.0
+pytz>=2024.1
+prometheus-flask-exporter==0.23.0
