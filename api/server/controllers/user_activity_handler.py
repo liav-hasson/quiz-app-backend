@@ -230,11 +230,11 @@ class UserActivityController:
         """
         logger.info("fetching_leaderboard")
         
-        # Get top 10 users from users collection
-        leaderboard = self.user_repository.get_leaderboard(limit=10)
+        # Get all users with XP (100 max for performance)
+        leaderboard = self.user_repository.get_leaderboard(limit=100)
         
-        # Get total users with attempts
-        total_users = self.user_repository.collection.count_documents({"questions_count": {"$gt": 0}})
+        # Get total users with XP (from solo or multiplayer)
+        total_users = self.user_repository.collection.count_documents({"experience": {"$gt": 0}})
         
         # Get current user's rank if authenticated
         current_user_data = None

@@ -162,12 +162,16 @@ class UserRepository(BaseRepository):
         import math
         
         pipeline = [
-            # Only include users who have answered questions
-            {"$match": {"questions_count": {"$gt": 0}}},
-            # Calculate average score as secondary stat
+            # Only include users who have earned XP (from solo or multiplayer)
+            {"$match": {"experience": {"$gt": 0}}},
+            # Calculate average score as secondary stat (handle multiplayer-only users with 0 questions)
             {"$addFields": {
                 "avg_score": {
-                    "$divide": ["$experience", "$questions_count"]
+                    "$cond": [
+                        {"$gt": ["$questions_count", 0]},
+                        {"$divide": ["$experience", "$questions_count"]},
+                        0
+                    ]
                 }
             }},
             # Sort by total experience (XP) descending
@@ -206,7 +210,7 @@ class UserRepository(BaseRepository):
         import math
         
         user = self.get_user_by_username(username)
-        if not user or user.get("questions_count", 0) == 0:
+        if not user or user.get("experience", 0) == 0:
             return None
         
         exp = user.get("experience", 0)
@@ -215,13 +219,12 @@ class UserRepository(BaseRepository):
         
         # Count how many users have higher total XP
         higher_count = self.collection.count_documents({
-            "questions_count": {"$gt": 0},
             "experience": {"$gt": exp}
         })
         rank = higher_count + 1
         
-        # Get total users with attempts for percentile
-        total_users = self.collection.count_documents({"questions_count": {"$gt": 0}})
+        # Get total users with XP for percentile
+        total_users = self.collection.count_documents({"experience": {"$gt": 0}})
         percentile = ((total_users - rank) / total_users * 100) if total_users > 0 else 0
         
         return {

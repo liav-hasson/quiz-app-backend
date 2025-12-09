@@ -82,16 +82,12 @@ def start_game_with_countdown(socketio, app, lobby_code, countdown_seconds=3, qu
                 "player_answers_tracking": {}  # Track which questions each player answered
             }, ttl_seconds=3600)
             
-            # Publish GAME_STARTED event via Redis
-            redis_client.publish_lobby_event(
-                lobby_code,
-                EventType.GAME_STARTED,
-                {
-                    "session_id": session_id,
-                    "total_questions": len(questions),
-                    "lobby_code": lobby_code
-                }
-            )
+            # Emit GAME_STARTED directly to clients (don't publish to Redis to avoid duplicate relay)
+            socketio.emit('game_started', {
+                "session_id": session_id,
+                "total_questions": len(questions),
+                "lobby_code": lobby_code
+            }, room=lobby_code, namespace='/')
             
             logger.info("game_started lobby=%s session=%s questions=%d", 
                        lobby_code, session_id, len(questions))
@@ -167,20 +163,16 @@ def run_game_loop(socketio, app, lobby_code):
                     game_state['current_question'] = question
                     redis_client.set_game_state(lobby_code, game_state, ttl_seconds=3600)
                     
-                    # Publish QUESTION_SENT event
-                    redis_client.publish_lobby_event(
-                        lobby_code,
-                        EventType.QUESTION_SENT,
-                        {
-                            "question": question['question_text'],
-                            "options": question['options'],
-                            "category": question.get('category', 'General'),
-                            "difficulty": question.get('difficulty', 2),
-                            "question_number": question_index + 1,
-                            "total_questions": len(questions),
-                            "time_limit": question_timer
-                        }
-                    )
+                    # Emit QUESTION_SENT directly (don't publish to Redis to avoid duplicate relay)
+                    socketio.emit('question_started', {
+                        "question": question['question_text'],
+                        "options": question['options'],
+                        "category": question.get('category', 'General'),
+                        "difficulty": question.get('difficulty', 2),
+                        "question_number": question_index + 1,
+                        "total_questions": len(questions),
+                        "time_limit": question_timer
+                    }, room=lobby_code, namespace='/')
                     
                     logger.info("question_emitted lobby=%s question=%d/%d", 
                                lobby_code, question_index + 1, len(questions))
@@ -324,24 +316,16 @@ def end_current_question(socketio, app, lobby_code, question_index):
             # Sort by score descending
             standings.sort(key=lambda x: x['score'], reverse=True)
             
-            # Publish ROUND_ENDED event
-            redis_client.publish_lobby_event(
-                lobby_code,
-                EventType.ROUND_ENDED,
-                {
-                    "correct_answer": correct_answer,
-                    "standings": standings
-                }
-            )
+            # Emit ROUND_ENDED directly (don't publish to Redis to avoid duplicate relay)
+            socketio.emit('question_ended', {
+                "correct_answer": correct_answer,
+                "standings": standings
+            }, room=lobby_code, namespace='/')
             
-            # Publish SCORES_UPDATED event
-            redis_client.publish_lobby_event(
-                lobby_code,
-                EventType.SCORES_UPDATED,
-                {
-                    "standings": standings
-                }
-            )
+            # Emit SCORES_UPDATED directly (don't publish to Redis to avoid duplicate relay)
+            socketio.emit('scores_updated', {
+                "standings": standings
+            }, room=lobby_code, namespace='/')
             
             logger.info("question_ended lobby=%s correct_answer=%s", 
                        lobby_code, correct_answer)
@@ -421,15 +405,11 @@ def finalize_game(socketio, app, lobby_code):
             logger.info("game_finalized lobby=%s winner=%s", 
                        lobby_code, results['rankings'][0]['username'] if results.get('rankings') else 'none')
             
-            # Publish GAME_ENDED event via Redis
-            redis_client.publish_lobby_event(
-                lobby_code,
-                EventType.GAME_ENDED,
-                {
-                    "final_standings": results.get('rankings', []),
-                    "xp_awarded": results.get('xp_awarded', {})
-                }
-            )
+            # Emit GAME_ENDED directly (don't publish to Redis to avoid duplicate relay)
+            socketio.emit('game_ended', {
+                "final_standings": results.get('rankings', []),
+                "xp_awarded": results.get('xp_awarded', {})
+            }, room=lobby_code, namespace='/')
             
             logger.info("game_ended_event_published lobby=%s", lobby_code)
             
