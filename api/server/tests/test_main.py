@@ -36,13 +36,17 @@ def test_subjects_missing_category(client):
 
 def test_generate_question(client):
     """Generate question should return question data."""
+    from unittest.mock import MagicMock
+
+    mock_ai_service = MagicMock()
+    mock_ai_service.generate_question.return_value = "What is Docker?"
 
     with patch("routes.quiz_routes.quiz_controller") as mock_controller, patch(
-        "routes.quiz_routes.generate_question"
-    ) as mock_generate:
+        "routes.quiz_routes.get_service"
+    ) as mock_get_service:
         mock_controller.get_random_keyword.return_value = "Docker"
         mock_controller.get_random_style_modifier.return_value = "friendly"
-        mock_generate.return_value = "What is Docker?"
+        mock_get_service.return_value = mock_ai_service
 
         response = client.post(
             "/api/question/generate",
@@ -59,9 +63,13 @@ def test_generate_question(client):
 
 def test_evaluate_answer(client):
     """Evaluate answer should return feedback."""
+    from unittest.mock import MagicMock
 
-    with patch("routes.quiz_routes.evaluate_answer") as mock_eval:
-        mock_eval.return_value = {"feedback": "Score: 8/10"}
+    mock_ai_service = MagicMock()
+    mock_ai_service.evaluate_answer.return_value = {"feedback": "Score: 8/10"}
+
+    with patch("routes.quiz_routes.get_service") as mock_get_service:
+        mock_get_service.return_value = mock_ai_service
 
         response = client.post(
             "/api/answer/evaluate",

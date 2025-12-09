@@ -136,6 +136,14 @@ class FakeCollection:
                 modified += 1
         return modified
 
+    def create_index(self, keys, **kwargs) -> str:
+        """No-op index creation for tests. Returns a mock index name."""
+        if isinstance(keys, str):
+            return f"{keys}_1"
+        elif isinstance(keys, list):
+            return "_".join(f"{k}_{v}" for k, v in keys)
+        return "mock_index"
+
 
 class FakeMongoDatabase:
     """Dictionary-like facade returning fake collections by name."""
