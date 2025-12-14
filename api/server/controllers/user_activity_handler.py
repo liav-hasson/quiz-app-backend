@@ -90,17 +90,13 @@ class UserActivityController:
         )
 
         logger.info(
-            "answer_saved answer_id=%s user_id=%s score=%s streak=%d",
-            answer_id,
-            user.get("_id"),
-            score,
-            streak_result["streak"],
-            "answer_saved answer_id=%s user_id=%s score=%s difficulty=%d weighted_score=%d",
+            "answer_saved answer_id=%s user_id=%s score=%s difficulty=%d weighted_score=%d streak=%d",
             answer_id,
             user.get("_id"),
             score,
             difficulty,
             weighted_score,
+            streak_result["streak"],
         )
 
         return answer_id

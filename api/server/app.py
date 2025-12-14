@@ -209,8 +209,12 @@ def setup_middleware(app: Flask) -> None:
     @app.before_request
     def authenticate_request() -> Optional[tuple]:
         """Authenticate requests using JWT Bearer tokens."""
-        # DEBUG LOGGING
-        print(f"DEBUG: authenticate_request method={request.method} path={request.path}", flush=True)
+        # Avoid leaking request paths in production logs
+        if app.debug:
+            print(
+                f"DEBUG: authenticate_request method={request.method} path={request.path}",
+                flush=True,
+            )
 
         # Always allow OPTIONS requests (CORS preflight)
         if request.method == "OPTIONS":
