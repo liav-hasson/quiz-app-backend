@@ -103,7 +103,8 @@ class Settings:
             # multiplayer lobby configuration
             lobby_code_length=int(env.get("LOBBY_CODE_LENGTH", "6")),
             lobby_expiry_hours=int(env.get("LOBBY_EXPIRY_HOURS", "2")),
-            min_players_to_start=int(env.get("MIN_PLAYERS_TO_START", "2")),
+            # Default to 1 for solo practice mode; set to 2+ for multiplayer-only
+            min_players_to_start=int(env.get("MIN_PLAYERS_TO_START", "1")),
             
             # rate limiting configuration
             rate_limit_questions_max=int(env.get("RATE_LIMIT_QUESTIONS_MAX", "10")),

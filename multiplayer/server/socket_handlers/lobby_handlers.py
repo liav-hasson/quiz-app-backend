@@ -29,8 +29,13 @@ def register_handlers(socketio):
         """Join a Socket.IO room for a lobby.
         
         This is called AFTER the frontend successfully calls the API to join a lobby.
-        The API handles the actual lobby join logic and publishes events.
-        This just adds the socket to the room to receive broadcasts.
+        The API handles the actual lobby join logic (updating DB, checking limits) 
+        and publishes events via Redis.
+        
+        This handler's job is simple:
+        1. Verify the user is allowed to be here (via @socket_authenticated)
+        2. Add their WebSocket connection to the specific "Room" for this lobby
+        3. Send them the recent chat history so they know what's happening
         
         Expected data: {
             "lobby_code": "ABC123"
@@ -43,7 +48,8 @@ def register_handlers(socketio):
                 emit('error', {'message': 'Lobby code required'})
                 return
             
-            # Join the Socket.IO room
+            # Join the Socket.IO room - this allows us to broadcast messages 
+            # to just the people in this specific lobby later.
             join_room(lobby_code)
             
             # Store user info in session for disconnect handling

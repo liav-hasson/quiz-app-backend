@@ -47,3 +47,43 @@ def google_token_login():
         google_id_token
     )
     return jsonify(response_data), status_code
+
+
+@auth_bp.route("/guest-login", methods=["POST"])
+def guest_login():
+    """Handle guest login without OAuth - creates or retrieves user by username.
+
+    Request Body:
+        username (str): The desired username (2-30 characters, alphanumeric with _ and -)
+
+    Returns:
+        JSON with user data and JWT token, or error message
+    """
+    import re
+
+    if auth_controller is None:
+        return jsonify({"error": "Service not initialized"}), 503
+
+    data = request.get_json()
+    if not data or "username" not in data:
+        return jsonify({"error": "Missing username"}), 400
+
+    username = data["username"].strip()
+
+    # Validate username length
+    if len(username) < 2 or len(username) > 30:
+        return jsonify({"error": "Username must be 2-30 characters"}), 400
+
+    # Validate username characters (alphanumeric, underscores, hyphens)
+    if not re.match(r"^[a-zA-Z0-9_-]+$", username):
+        return (
+            jsonify(
+                {
+                    "error": "Username can only contain letters, numbers, underscores, and hyphens"
+                }
+            ),
+            400,
+        )
+
+    response_data, status_code = auth_controller.handle_guest_login(username)
+    return jsonify(response_data), status_code

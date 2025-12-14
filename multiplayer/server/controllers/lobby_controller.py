@@ -1,4 +1,6 @@
 from typing import List, Dict, Any, Optional
+
+from common.utils.config import settings
 from server.models.repositories.lobby_repository import LobbyRepository
 from common.repositories.quiz_repository import QuizRepository
 
@@ -87,9 +89,10 @@ class LobbyController:
             
         if lobby["creator_id"] != user_id:
             raise ValueError("Only creator can start the game")
-            
-        if len(lobby["players"]) < 2: # Should be MIN_PLAYERS_TO_START from config
-            raise ValueError("Not enough players to start")
+
+        min_players = settings.min_players_to_start or 1
+        if len(lobby["players"]) < min_players:
+            raise ValueError(f"Not enough players to start (need {min_players})")
             
         if not self.check_all_ready(lobby_code):
             raise ValueError("Not all players are ready")

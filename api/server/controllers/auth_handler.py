@@ -125,3 +125,105 @@ class AuthController:
         except Exception as e:
             logger.error("google_token_login_failed error=%s", str(e), exc_info=True)
             return {"error": "Failed to process Google token"}, 500
+
+    def handle_guest_login(self, username: str) -> Tuple[Dict[str, Any], int]:
+        """Handle guest login - create or retrieve user without OAuth.
+
+        Creates a new guest user if username doesn't exist, or returns
+        existing user if they've logged in before. Guest users have
+        auth_type='guest' and use DiceBear for avatar generation.
+
+        Args:
+            username: The desired username (already validated by route)
+
+        Returns:
+            Tuple of (response_data, status_code)
+            Response contains: id, email, name, username, picture, token, streak
+        """
+        from datetime import datetime
+
+        try:
+            # Check if guest user with this username already exists
+            existing_user_doc = self.user_repository.collection.find_one(
+                {"username": username, "auth_type": "guest"}
+            )
+
+            if existing_user_doc:
+                # Existing guest user - generate new token and normalize XP/counts
+                mongo_id = existing_user_doc.get("_id")
+                if mongo_id is not None:
+                    self.user_repository.collection.update_one(
+                        {"_id": mongo_id},
+                        {"$set": {"experience": 0, "questions_count": 0}},
+                    )
+
+                existing_user_doc["experience"] = 0
+                existing_user_doc["questions_count"] = 0
+                existing_user_doc["_id"] = str(existing_user_doc["_id"])
+                user = existing_user_doc
+                logger.info(
+                    "guest_login_existing user_id=%s username=%s",
+                    user["_id"],
+                    username,
+                )
+            else:
+                # Check if username is taken by a Google user
+                google_user = self.user_repository.collection.find_one(
+                    {"username": username}
+                )
+                if google_user:
+                    return {"error": "Username already taken"}, 409
+
+                # Create new guest user
+                now = datetime.now()
+
+                user_doc = {
+                    "username": username,
+                    "email": f"{username}@guest.quizlabs.local",  # Placeholder email
+                    "name": username,
+                    "picture": f"https://api.dicebear.com/7.x/avataaars/svg?seed={username}",
+                    "auth_type": "guest",
+                    "experience": 0,
+                    "questions_count": 0,
+                    "streak": 0,
+                    "last_activity_date": None,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+
+                result = self.user_repository.collection.insert_one(user_doc)
+                user = self.user_repository.collection.find_one(
+                    {"_id": result.inserted_id}
+                )
+                user["_id"] = str(user["_id"])
+                logger.info(
+                    "guest_login_created user_id=%s username=%s", user["_id"], username
+                )
+
+            # Check and reset streak if needed
+            if self.user_activity_controller:
+                streak_result = (
+                    self.user_activity_controller.check_and_reset_streak_on_login(user)
+                )
+                if streak_result["was_reset"]:
+                    user["streak"] = 0
+
+            # Generate JWT token
+            app_token = self.token_service.generate(user)
+
+            return {
+                "id": str(user.get("_id")),
+                "email": user.get("email"),
+                "name": user.get("name"),
+                "username": user.get("username"),
+                "picture": user.get("picture"),
+                "token": app_token,
+                "streak": user.get("streak", 0),
+                "experience": user.get("experience", 0),
+                "questions_count": user.get("questions_count", 0),
+                "auth_type": "guest",
+            }, 200
+
+        except Exception as e:
+            logger.error("guest_login_failed error=%s", str(e), exc_info=True)
+            return {"error": "Failed to process guest login"}, 500

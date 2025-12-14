@@ -28,7 +28,17 @@ class TokenService:
         self._algorithm = algorithm
 
     def generate(self, user: Dict[str, Any]) -> str:
-        """Return a signed JWT for the provided user payload."""
+        """Return a signed JWT for the provided user payload.
+        
+        This function creates the "Session Token" that the frontend will use
+        to prove who the user is for all future requests.
+        
+        It includes:
+        - sub: The user's unique ID (Subject)
+        - email: The user's email
+        - exp: When this token expires (so they have to login again eventually)
+        - iat: When this token was created (Issued At)
+        """
 
         secret = self._secret_provider()
         now = datetime.now(self._timezone)
@@ -39,10 +49,16 @@ class TokenService:
             "exp": now + timedelta(days=self._expires_days),
             "iat": now,
         }
+        # We sign the token with our secret key so no one can fake it
         return jwt.encode(payload, secret, algorithm=self._algorithm)
 
     def decode(self, token: str) -> Dict[str, Any]:
-        """Decode and validate a JWT."""
+        """Decode and validate a JWT.
+        
+        This checks if the token sent by the user is valid.
+        If the signature doesn't match (wrong secret) or the token is expired,
+        this will raise an error.
+        """
 
         secret = self._secret_provider()
         return jwt.decode(token, secret, algorithms=[self._algorithm])

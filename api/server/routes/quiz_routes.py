@@ -307,7 +307,7 @@ def test_ai_configuration():
                 "error": "Invalid API key. Please check your OpenAI API key.",
                 "model": custom_model,
                 "custom_key": bool(custom_api_key),
-            }), 401
+            }), 400  # Use 400, not 401 - 401 is reserved for session authentication
         elif "model" in error_message.lower() and ("not found" in error_message.lower() or "does not exist" in error_message.lower()):
             return jsonify({
                 "success": False,
