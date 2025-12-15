@@ -237,18 +237,17 @@ def setup_middleware(app: Flask) -> None:
         require_auth = current_app.config.get("REQUIRE_AUTHENTICATION", True)
         logger.info("auth_middleware_check path=%s require_auth=%s", request.path, require_auth)
         
-        if not require_auth:
-            return None
-
-        if any(request.path.startswith(path) for path in exempt_paths):
+        # Check if this is an exempt path
+        is_exempt = any(request.path.startswith(path) for path in exempt_paths)
+        if is_exempt:
             logger.info("auth_middleware_exempt path=%s", request.path)
-            return None
-
+            # Still try to authenticate if token provided, but don't require it
+            # Fall through to optional auth below
+        
         # Special exemption for GET /api/multiplayer/lobby/<id> (Public details)
-        # But POST/PUT/PATCH to /api/multiplayer/lobby/... must be authenticated
-        if request.path.startswith("/api/multiplayer/lobby/") and request.method == "GET":
-             logger.info("auth_middleware_exempt_lobby_get path=%s", request.path)
-             return None
+        is_lobby_get = request.path.startswith("/api/multiplayer/lobby/") and request.method == "GET"
+        if is_lobby_get:
+            logger.info("auth_middleware_exempt_lobby_get path=%s", request.path)
 
         # Get dependencies from app extensions (thread-safe)
         user_repository = current_app.extensions.get("user_repository")
@@ -264,7 +263,12 @@ def setup_middleware(app: Flask) -> None:
 
         # Extract JWT from Authorization header
         auth_header = request.headers.get("Authorization", "")
-        if not auth_header.lower().startswith("bearer "):
+        has_token = auth_header.lower().startswith("bearer ")
+        
+        # If no token and auth is not required (or exempt path), allow request
+        if not has_token:
+            if not require_auth or is_exempt or is_lobby_get:
+                return None
             logger.warning("missing_bearer_token path=%s", request.path)
             return jsonify({"error": "Authentication required"}), 401
 
