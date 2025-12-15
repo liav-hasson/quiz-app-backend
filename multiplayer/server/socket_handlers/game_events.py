@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 # This file only contains the start_game_with_countdown function
 # which is called from the Redis event listener.
 
-def start_game_with_countdown(socketio, app, lobby_code, countdown_seconds=3, question_list=None, question_timer=10):
+def start_game_with_countdown(socketio, app, lobby_code, countdown_seconds=3, question_list=None, question_timer=10, ai_settings=None):
     """Background task to handle countdown and start game.
     
     This is called from the Redis event listener when GAME_STARTING event is received.
@@ -22,6 +22,7 @@ def start_game_with_countdown(socketio, app, lobby_code, countdown_seconds=3, qu
         countdown_seconds: Countdown duration (default 3)
         question_list: List of question set configurations from lobby
         question_timer: Time limit for each question in seconds
+        ai_settings: Optional dict with 'api_key' and 'model' for AI question generation
     """
     with app.app_context():
         try:
@@ -47,13 +48,21 @@ def start_game_with_countdown(socketio, app, lobby_code, countdown_seconds=3, qu
             if not internal_secret:
                 raise Exception("INTERNAL_SERVICE_SECRET not configured")
             
+            # Build headers with internal secret and optional AI settings
+            headers = {
+                "X-Internal-Secret": internal_secret
+            }
+            if ai_settings:
+                if ai_settings.get("api_key"):
+                    headers["X-OpenAI-API-Key"] = ai_settings["api_key"]
+                if ai_settings.get("model"):
+                    headers["X-OpenAI-Model"] = ai_settings["model"]
+            
             api_url = f"http://{settings.api_host}:{settings.api_port}/api/multiplayer/game-session/create"
             response = requests.post(api_url, json={
                 "lobby_code": lobby_code,
                 "question_list": question_list or []
-            }, headers={
-                "X-Internal-Secret": internal_secret
-            }, timeout=30)
+            }, headers=headers, timeout=60)
             
             if response.status_code != 200:
                 raise Exception(f"API call failed: {response.text}")

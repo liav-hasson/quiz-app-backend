@@ -264,8 +264,12 @@ def relay_event_to_room(sio, room, event_type, event_data):
         question_list = lobby_data.get('question_list', [])
         question_timer = lobby_data['question_timer']  # No fallback - lobby must have this
         
-        logger.info("game_starting_received lobby=%s countdown=%d questions=%d timer=%d", 
-                   lobby_code, countdown_seconds, len(question_list), question_timer)
+        # Extract AI settings if provided (for user-provided API key)
+        ai_settings = event_data.get('ai_settings')
+        
+        logger.info("game_starting_received lobby=%s countdown=%d questions=%d timer=%d has_ai_key=%s", 
+                   lobby_code, countdown_seconds, len(question_list), question_timer,
+                   "yes" if ai_settings and ai_settings.get('api_key') else "no")
         
         # Start background task for countdown and game initialization
         sio.start_background_task(
@@ -275,7 +279,8 @@ def relay_event_to_room(sio, room, event_type, event_data):
             lobby_code,
             countdown_seconds,
             question_list,
-            question_timer
+            question_timer,
+            ai_settings
         )
         return  # Don't emit twice - countdown handler will emit
     

@@ -635,16 +635,27 @@ def start_game(lobby_code: str):
         if not question_list or len(question_list) == 0:
             return jsonify({"error": "No questions configured. Add questions before starting."}), 400
 
+        # Get custom AI settings from request headers to forward to multiplayer
+        custom_api_key = request.headers.get("X-OpenAI-API-Key")
+        custom_model = request.headers.get("X-OpenAI-Model")
+        
+        logger.info("start_game_headers code=%s has_api_key=%s has_model=%s",
+                    lobby_code, "yes" if custom_api_key else "no", "yes" if custom_model else "no")
+
         # Update status to countdown
         lobby_repository.update_lobby_status(lobby_code, "countdown")
 
-        # Publish game starting event
+        # Publish game starting event with AI settings
         publish_lobby_event(
             lobby_code,
             EventType.GAME_STARTING,
             {
                 "lobby": serialize_lobby(lobby.copy()),
-                "countdown_seconds": 3  # Default countdown
+                "countdown_seconds": 3,  # Default countdown
+                "ai_settings": {
+                    "api_key": custom_api_key,
+                    "model": custom_model,
+                } if custom_api_key else None
             }
         )
 
@@ -716,6 +727,10 @@ def create_game_session():
         if not lobby:
             return jsonify({"error": "Lobby not found"}), 404
         
+        # Get custom AI settings from request headers (same as single-player)
+        custom_api_key = request.headers.get("X-OpenAI-API-Key")
+        custom_model = request.headers.get("X-OpenAI-Model")
+        
         # Generate questions based on question_list
         from common.utils.ai.service import AIQuestionService
         ai_service = AIQuestionService()
@@ -744,9 +759,11 @@ def create_game_session():
                     question_data = ai_service.generate_multiplayer_question(
                         category=category,
                         subcategory=subject,
-                        keyword=keyword,  # Use random keyword for variety
+                        keyword=keyword,
                         difficulty=difficulty,
-                        style_modifier=style_modifier  # Add style variation
+                        style_modifier=style_modifier,
+                        custom_api_key=custom_api_key,
+                        custom_model=custom_model,
                     )
                     questions.append({
                         "question_text": question_data["question"],

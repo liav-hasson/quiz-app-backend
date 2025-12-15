@@ -115,20 +115,24 @@ class AIQuestionService:
         keyword: str,
         difficulty: int,
         style_modifier: Optional[str] = None,
+        custom_api_key: Optional[str] = None,
+        custom_model: Optional[str] = None,
     ) -> Dict[str, any]:
         """Generate a multiple-choice question for multiplayer mode with structured JSON response.
         
         Returns:
             Dict with keys: question, options (list of 4), correct_answer, explanation
         """
+        model = self._get_model(custom_model)
         logger.info(
-            "openai_generate_multiplayer_question_start category=%s subcategory=%s keyword=%s difficulty=%d style_modifier=%s model=%s",
+            "openai_generate_multiplayer_question_start category=%s subcategory=%s keyword=%s difficulty=%d style_modifier=%s model=%s custom_key=%s",
             category,
             subcategory,
             keyword,
             difficulty,
             style_modifier,
-            settings.openai_model,
+            model,
+            "yes" if custom_api_key else "no",
         )
 
         prompt_template = self._multiplayer_prompts[difficulty]
@@ -141,8 +145,9 @@ class AIQuestionService:
             style_modifier=style_modifier or "general knowledge",
         )
 
-        response = self._provider.chat_completion(
-            model=settings.openai_model,
+        provider = self._get_provider(custom_api_key)
+        response = provider.chat_completion(
+            model=model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=settings.openai_max_tokens_question + 100,  # Slightly more tokens for structured output
             temperature=settings.openai_temperature_question,
