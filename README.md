@@ -4,13 +4,14 @@ Flask API for the Quiz App platform (auth, quiz generation, stats, leaderboard, 
 
 ---
 ## Related Repositories
+
 - Frontend: https://github.com/liav-hasson/quiz-app-frontend
 - GitOps: https://github.com/liav-hasson/quiz-app-gitops
 - IaC: https://github.com/liav-hasson/quiz-app-iac
 - Mini (local all-in-one): https://github.com/liav-hasson/quiz-app-mini
 
 ---
-## How to Run (recommended)
+## How to Run 
 Use the mini-version Docker Compose to start frontend, backend, multiplayer, Mongo, and Redis together:
 - `cd mini-version/bootstrap && ./start-local.sh`
 - App: http://localhost:3000, API: http://localhost:5000 (`/api/health`), Multiplayer: http://localhost:5001
@@ -24,7 +25,7 @@ Use the mini-version Docker Compose to start frontend, backend, multiplayer, Mon
 - Prometheus metrics on `/metrics`
 
 ---
-## Core Flow (high level)
+## Core Flow 
 - Auth: frontend sends Google ID token → API verifies (optional) → issues JWT → frontend stores `quiz_user`.
 - Quiz generation: frontend calls `/api/question/generate` → API calls OpenAI (if key set) or falls back to stored data → returns question payload.
 - Answer evaluation: frontend posts to `/api/answer/evaluate` → API asks OpenAI for score/feedback → response returned; `/api/user/answers` can persist history.

@@ -1,11 +1,15 @@
 # Repositories
 
-Data-access layer for Mongo (User, Quiz, Question, etc.) shared by API and multiplayer.
+Data-access layer for MongoDB collections (User, Quiz, Question, etc.) shared by API and multiplayer services.
 
-Why: keeps controllers clean, reuses queries, and is easy to mock in tests.
+---
+## Purpose
+- Keeps controllers clean by abstracting database queries
+- Provides reusable query patterns across services
+- Simplifies testing through mockable interfaces
 
-Usage example:
-```python
-from common.repositories.user_repository import UserRepository
-user = UserRepository.get_by_id(user_id)
-```
+---
+## Contents
+- `user_repository.py` - User CRUD and profile operations
+- `quiz_repository.py` - Quiz session management
+- `question_repository.py` - Question storage and retrieval
