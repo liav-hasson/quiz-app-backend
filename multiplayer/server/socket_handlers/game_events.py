@@ -195,6 +195,9 @@ def run_game_loop(socketio, app, lobby_code):
                     lobby_state = redis_client.get_lobby_state(lobby_code) or {}
                     player_count = len(lobby_state.get('players', []))
                     
+                    logger.info("question_timer_started lobby=%s question=%d player_count=%d timer=%ds", 
+                               lobby_code, question_index + 1, player_count, question_timer)
+                    
                     while elapsed < question_timer:
                         time.sleep(check_interval)
                         elapsed += check_interval
@@ -208,6 +211,11 @@ def run_game_loop(socketio, app, lobby_code):
                                 1 for user_answers in player_answers.values()
                                 if any(a.get('question_index') == question_index for a in user_answers)
                             )
+                            
+                            # DEBUG: Log checking every 5 seconds
+                            if int(elapsed) % 5 == 0:
+                                logger.info("auto_advance_check lobby=%s question=%d answered=%d/%d", 
+                                           lobby_code, question_index + 1, answered_count, player_count)
                             
                             if answered_count >= player_count and player_count > 0:
                                 logger.info("all_players_answered lobby=%s question=%d elapsed=%.1f", 

@@ -102,6 +102,11 @@ def register_handlers(socketio):
             })
             game_state['player_answers'] = player_answers
             
+            # DEBUG: Log answer tracking for auto-advance
+            logger.info("answer_tracking lobby=%s user=%s question_index=%d total_answers=%d", 
+                       lobby_code, user_id, game_state.get('current_question_index', 0), 
+                       len(player_answers))
+            
             # Save updated state
             redis_client.set_game_state(lobby_code, game_state)
             

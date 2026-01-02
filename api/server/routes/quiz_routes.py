@@ -254,24 +254,30 @@ def test_ai_configuration():
     
     Makes a simple API call to verify the configuration works.
     """
-    custom_api_key, custom_model = _get_custom_ai_settings()
+    from common.utils.ai import OpenAIProvider
+    from common.utils.config import get_settings
     
-    if not custom_api_key and not custom_model:
+    custom_api_key, custom_model = _get_custom_ai_settings()
+    settings = get_settings()
+    
+    # Determine if we have any API key available (custom or server)
+    has_api_key = bool(custom_api_key or settings.openai_api_key or settings.openai_ssm_parameter_name)
+    
+    if not has_api_key:
+        # No API key available at all
         return jsonify({
-            "success": True,
-            "message": "Using default server configuration",
+            "success": False,
+            "error": "No OpenAI API key configured. Please provide your API key.",
             "model": None,
             "custom_key": False,
-        }), 200
+        }), 400
     
     try:
-        from common.utils.ai import OpenAIProvider
-        
-        # Create provider with custom key if provided
+        # Create provider with custom key if provided, otherwise use server config
         provider = OpenAIProvider(api_key=custom_api_key) if custom_api_key else OpenAIProvider()
         
         # Determine which model to test
-        model_to_test = custom_model or "gpt-4o-mini"
+        model_to_test = custom_model or settings.openai_model or "gpt-4o-mini"
         
         # Use the provider's chat_completion method which handles parameter adaptation
         response = provider.chat_completion(
@@ -322,3 +328,58 @@ def test_ai_configuration():
                 "model": custom_model,
                 "custom_key": bool(custom_api_key),
             }), 500
+
+
+@quiz_bp.route("/quiz/perfect-answer", methods=["POST"])
+def generate_perfect_answer():
+    """Generate a perfect 10/10 answer for a given question.
+    
+    Request body:
+        question (str): The question text
+    
+    Returns:
+        200: {"perfect_answer": "..."}
+        400: Missing/invalid input
+        500: Generation error
+    """
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if not data or "question" not in data:
+            return jsonify({
+                "error": "Missing required field: question"
+            }), 400
+        
+        question = data["question"].strip()
+        if not question:
+            return jsonify({
+                "error": "Question cannot be empty"
+            }), 400
+        
+        logger.info("generate_perfect_answer_route question_length=%d", len(question))
+        
+        # Get custom AI settings from headers
+        custom_api_key, custom_model = _get_custom_ai_settings()
+        
+        ai_service = get_service()
+        result = ai_service.generate_perfect_answer(
+            question,
+            custom_api_key=custom_api_key,
+            custom_model=custom_model,
+        )
+        
+        return jsonify(result), 200
+        
+    except ValueError as e:
+        error_message = str(e)
+        logger.error("generate_perfect_answer_validation_error error=%s", error_message)
+        return jsonify({
+            "error": error_message
+        }), 400
+    except Exception as e:
+        error_message = str(e)
+        logger.error("generate_perfect_answer_failed error=%s", error_message)
+        return jsonify({
+            "error": f"Failed to generate perfect answer: {error_message}"
+        }), 500

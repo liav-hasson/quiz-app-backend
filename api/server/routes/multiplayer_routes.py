@@ -913,19 +913,28 @@ def submit_answer():
         logger.info("update_player_score lobby=%s user=%s score=%d success=%s", 
                    lobby_code, user_id, total_score, update_result)
         
-        # CRITICAL: Also update Redis game_state.player_scores so game loop has accurate scores
+        # CRITICAL: Also update Redis game_state.player_scores AND player_answers so game loop has accurate data
         from common.redis_client import get_redis_client, EventType
         redis_client = get_redis_client()
         
-        # Update Redis game state with new score
+        # Update Redis game state with new score and answer tracking
         game_state = redis_client.get_game_state(lobby_code)
         if game_state:
+            # Update player scores
             player_scores = game_state.get('player_scores', {})
             player_scores[user_id] = total_score
             game_state['player_scores'] = player_scores
+            
+            # Update player answers for auto-advance detection
+            redis_player_answers = game_state.get('player_answers', {})
+            if user_id not in redis_player_answers:
+                redis_player_answers[user_id] = []
+            redis_player_answers[user_id].append(answer_record)
+            game_state['player_answers'] = redis_player_answers
+            
             redis_client.set_game_state(lobby_code, game_state, ttl_seconds=3600)
-            logger.info("redis_game_state_score_updated lobby=%s user=%s score=%d", 
-                       lobby_code, user_id, total_score)
+            logger.info("redis_game_state_updated lobby=%s user=%s score=%d question=%d", 
+                       lobby_code, user_id, total_score, current_index)
         
         # Get updated lobby with all player scores
         lobby = lobby_repository.get_lobby_by_code(lobby_code)

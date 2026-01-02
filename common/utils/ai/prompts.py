@@ -42,9 +42,23 @@ EVAL_PROMPT = (
     'A: "{answer}"\n\n'
     "Tasks: \n"
     "1. Review the student's answer based on the question, and expected difficulty. Expect a short response, no more than 100 words. Ignore casing and punctuation in evaluation.\n"
-    "2. Give short, constructive feedback on the user's answer quality, note only on significant mistakes.\n"
+    "2. Give short feedback on the user's answer quality, note only on significant mistakes. no more than 50 words.\n"
     "3. Scoring: 10 = fully correct; 8–9 = mostly correct; 6–7 = partly correct; 4–5 = major gaps; 0–3 = mostly wrong.\n\n"
     'Output format: {{"score": "X/10", "feedback": "your feedback here"}}\n'
+    "Do NOT wrap the JSON in ```json or ``` markers."
+)
+
+PERFECT_ANSWER_PROMPT = (
+    "You are an expert DevOps engineer providing a perfect model answer to a technical question.\n\n"
+    'Question: "{question}"\n\n'
+    "Provide a concise, comprehensive, and technically accurate answer that would score 10/10. "
+    "Your answer should:\n"
+    "- Be clear and well-structured\n"
+    "- Include all key concepts and details\n"
+    "- Use proper technical terminology\n"
+    "- Be 3-5 sentences (approximately 50-100 words)\n"
+    "- Serve as a reference for what a perfect answer looks like\n\n"
+    "Return ONLY the answer text, no additional formatting or preamble."
     "Do NOT wrap the JSON in ```json or ``` markers."
 )
 
