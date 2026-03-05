@@ -187,16 +187,12 @@ def run_game_loop(socketio, app, lobby_code):
                                lobby_code, question_index + 1, len(questions))
                     
                     # Wait for timer to expire OR all players to answer
-                    # Check every 0.5 seconds if all players have answered
+                    # Check every 0.25 seconds if all players have answered
                     elapsed = 0
-                    check_interval = 0.5
+                    check_interval = 0.25
                     
-                    # Get player count from lobby
-                    lobby_state = redis_client.get_lobby_state(lobby_code) or {}
-                    player_count = len(lobby_state.get('players', []))
-                    
-                    logger.info("question_timer_started lobby=%s question=%d player_count=%d timer=%ds", 
-                               lobby_code, question_index + 1, player_count, question_timer)
+                    logger.info("question_timer_started lobby=%s question=%d timer=%ds", 
+                               lobby_code, question_index + 1, question_timer)
                     
                     while elapsed < question_timer:
                         time.sleep(check_interval)
@@ -212,8 +208,17 @@ def run_game_loop(socketio, app, lobby_code):
                                 if any(a.get('question_index') == question_index for a in user_answers)
                             )
                             
+                            # Re-read connected player count each iteration so
+                            # disconnected players don't block auto-advance
+                            lobby_state = redis_client.get_lobby_state(lobby_code) or {}
+                            connected_count = sum(
+                                1 for p in lobby_state.get('players', [])
+                                if p.get('connected', True)
+                            )
+                            player_count = max(connected_count, 1)
+                            
                             # DEBUG: Log checking every 5 seconds
-                            if int(elapsed) % 5 == 0:
+                            if int(elapsed * 4) % 20 == 0 and elapsed > 0:
                                 logger.info("auto_advance_check lobby=%s question=%d answered=%d/%d", 
                                            lobby_code, question_index + 1, answered_count, player_count)
                             

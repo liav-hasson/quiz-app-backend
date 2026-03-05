@@ -100,32 +100,36 @@ def generate_question_route():
         logger.warning("generate_question_validation_failed error=%s", str(e))
         return jsonify({"error": str(e)}), 400
 
-    # Rate limiting - get user ID from auth or use IP as fallback
+    # Rate limiting - skip for users with their own API key
+    custom_api_key, custom_model = _get_custom_ai_settings()
+    has_custom_key = bool(custom_api_key)
+
     user = getattr(g, "user", None)
     user_id = user.get("_id") if user else request.remote_addr
-    
-    allowed, remaining, reset_time = question_limiter.check_rate_limit(
-        user_id, "question_generate"
-    )
-    
-    # Add rate limit headers
-    headers = {
-        "X-RateLimit-Limit": str(question_limiter.config.max_requests),
-        "X-RateLimit-Remaining": str(remaining),
-        "X-RateLimit-Reset": str(reset_time),
-    }
-    
-    if not allowed:
-        logger.warning(
-            "rate_limit_exceeded_question user=%s",
-            user_id
+
+    headers = {}
+    if not has_custom_key:
+        allowed, remaining, reset_time = question_limiter.check_rate_limit(
+            user_id, "question_generate"
         )
-        return jsonify({
-            "error": "Rate limit exceeded. Please wait before generating more questions.",
-            "limit": question_limiter.config.max_requests,
-            "window_seconds": question_limiter.config.window_seconds,
-            "reset_time": reset_time,
-        }), 429, headers
+        headers = {
+            "X-RateLimit-Limit": str(question_limiter.config.max_requests),
+            "X-RateLimit-Remaining": str(remaining),
+            "X-RateLimit-Reset": str(reset_time),
+        }
+        if not allowed:
+            logger.warning(
+                "rate_limit_exceeded_question user=%s",
+                user_id
+            )
+            return jsonify({
+                "error": "Rate limit exceeded. Please wait before generating more questions.",
+                "limit": question_limiter.config.max_requests,
+                "window_seconds": question_limiter.config.window_seconds,
+                "reset_time": reset_time,
+            }), 429, headers
+    else:
+        logger.info("rate_limit_bypassed_custom_key user=%s", user_id)
 
     try:
         logger.info(
@@ -190,38 +194,39 @@ def evaluate_answer_route():
         logger.warning("evaluate_answer_validation_failed error=%s", str(e))
         return jsonify({"error": str(e)}), 400
 
-    # Rate limiting - get user ID from auth or use IP as fallback
+    # Rate limiting - skip for users with their own API key
+    custom_api_key, custom_model = _get_custom_ai_settings()
+    has_custom_key = bool(custom_api_key)
+
     user = getattr(g, "user", None)
     user_id = user.get("_id") if user else request.remote_addr
-    
-    allowed, remaining, reset_time = evaluation_limiter.check_rate_limit(
-        user_id, "answer_evaluate"
-    )
-    
-    # Add rate limit headers
-    headers = {
-        "X-RateLimit-Limit": str(evaluation_limiter.config.max_requests),
-        "X-RateLimit-Remaining": str(remaining),
-        "X-RateLimit-Reset": str(reset_time),
-    }
-    
-    if not allowed:
-        logger.warning(
-            "rate_limit_exceeded_evaluation user=%s",
-            user_id
+
+    headers = {}
+    if not has_custom_key:
+        allowed, remaining, reset_time = evaluation_limiter.check_rate_limit(
+            user_id, "answer_evaluate"
         )
-        return jsonify({
-            "error": "Rate limit exceeded. Please wait before submitting more answers.",
-            "limit": evaluation_limiter.config.max_requests,
-            "window_seconds": evaluation_limiter.config.window_seconds,
-            "reset_time": reset_time,
-        }), 429, headers
+        headers = {
+            "X-RateLimit-Limit": str(evaluation_limiter.config.max_requests),
+            "X-RateLimit-Remaining": str(remaining),
+            "X-RateLimit-Reset": str(reset_time),
+        }
+        if not allowed:
+            logger.warning(
+                "rate_limit_exceeded_evaluation user=%s",
+                user_id
+            )
+            return jsonify({
+                "error": "Rate limit exceeded. Please wait before submitting more answers.",
+                "limit": evaluation_limiter.config.max_requests,
+                "window_seconds": evaluation_limiter.config.window_seconds,
+                "reset_time": reset_time,
+            }), 429, headers
+    else:
+        logger.info("rate_limit_bypassed_custom_key user=%s", user_id)
 
     try:
         logger.info("evaluate_answer_route difficulty=%d", difficulty)
-        
-        # Get custom AI settings from headers
-        custom_api_key, custom_model = _get_custom_ai_settings()
         
         ai_service = get_service()
         evaluation = ai_service.evaluate_answer(

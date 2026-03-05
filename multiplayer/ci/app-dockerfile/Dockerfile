@@ -34,8 +34,10 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:5001/api/health')"
 
 # Set environment
+ARG APP_VERSION=dev
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app:/app/server
+    PYTHONPATH=/app:/app/server \
+    APP_VERSION=${APP_VERSION}
 
 # Run with eventlet worker for WebSocket support
 # Use wsgi.py entry point to ensure monkey patching happens before imports

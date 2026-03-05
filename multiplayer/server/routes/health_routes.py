@@ -1,5 +1,6 @@
 """Health check routes for the multiplayer WebSocket server."""
 
+import os
 from flask import Blueprint, jsonify, current_app
 
 
@@ -13,7 +14,7 @@ def init_health_routes():
         return jsonify({
             'status': 'healthy',
             'service': 'quiz-multiplayer',
-            'version': '2.0.0'
+            'version': os.environ.get('APP_VERSION', 'dev')
         }), 200
     
     @health_bp.route('/api/health/ready', methods=['GET'])

@@ -21,6 +21,9 @@ ENV PATH=/usr/local/bin:/home/appuser/.local/bin:$PATH \
     FLASK_HOST=0.0.0.0 \
     FLASK_PORT=5000
 
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
+
 # Copy installed packages from build stage (system-wide)
 COPY --from=build-stage /usr/local /usr/local
 

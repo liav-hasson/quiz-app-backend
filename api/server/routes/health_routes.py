@@ -94,6 +94,7 @@ def health():
 
     response = {
         "status": "ok" if overall_healthy else "degraded",
+        "version": os.environ.get("APP_VERSION", "dev"),
         "dependencies": {
             name: {"healthy": healthy, "details": details}
             for name, (healthy, details) in dependency_results.items()
