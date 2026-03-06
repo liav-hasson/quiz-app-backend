@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 # This file only contains the start_game_with_countdown function
 # which is called from the Redis event listener.
 
-def start_game_with_countdown(socketio, app, lobby_code, countdown_seconds=3, question_list=None, question_timer=10, ai_settings=None):
+def start_game_with_countdown(socketio, app, lobby_code, countdown_seconds=3, question_list=None, question_timer=10, ai_settings=None, player_count=0):
     """Background task to handle countdown and start game.
     
     This is called from the Redis event listener when GAME_STARTING event is received.
@@ -23,6 +23,7 @@ def start_game_with_countdown(socketio, app, lobby_code, countdown_seconds=3, qu
         question_list: List of question set configurations from lobby
         question_timer: Time limit for each question in seconds
         ai_settings: Optional dict with 'api_key' and 'model' for AI question generation
+        player_count: Number of players in the lobby at game start
     """
     with app.app_context():
         try:
@@ -87,6 +88,7 @@ def start_game_with_countdown(socketio, app, lobby_code, countdown_seconds=3, qu
                 "questions": questions,
                 "status": "in_progress",
                 "question_timer": question_timer,
+                "player_count": player_count,  # Authoritative count from lobby at game start
                 "player_scores": player_scores,  # Initialize scores
                 "player_answers_tracking": {}  # Track which questions each player answered
             }, ttl_seconds=3600)
@@ -208,9 +210,9 @@ def run_game_loop(socketio, app, lobby_code):
                                 if any(a.get('question_index') == question_index for a in user_answers)
                             )
                             
-                            # Use player_scores (initialized at game start with all players)
-                            # as the authoritative player count — not lobby state
-                            player_count = max(len(current_state.get('player_scores', {})), 1)
+                            # Use player_count stored at game start (from lobby data)
+                            # as the authoritative count — not derived from answers
+                            player_count = max(current_state.get('player_count', 1), 1)
                             
                             # DEBUG: Log checking every 5 seconds
                             if int(elapsed * 4) % 20 == 0 and elapsed > 0:
