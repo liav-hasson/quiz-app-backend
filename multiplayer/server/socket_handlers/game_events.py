@@ -208,14 +208,9 @@ def run_game_loop(socketio, app, lobby_code):
                                 if any(a.get('question_index') == question_index for a in user_answers)
                             )
                             
-                            # Re-read connected player count each iteration so
-                            # disconnected players don't block auto-advance
-                            lobby_state = redis_client.get_lobby_state(lobby_code) or {}
-                            connected_count = sum(
-                                1 for p in lobby_state.get('players', [])
-                                if p.get('connected', True)
-                            )
-                            player_count = max(connected_count, 1)
+                            # Use player_scores (initialized at game start with all players)
+                            # as the authoritative player count — not lobby state
+                            player_count = max(len(current_state.get('player_scores', {})), 1)
                             
                             # DEBUG: Log checking every 5 seconds
                             if int(elapsed * 4) % 20 == 0 and elapsed > 0:
