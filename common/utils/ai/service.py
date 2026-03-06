@@ -114,37 +114,31 @@ class AIQuestionService:
         self,
         category: str,
         subcategory: str,
-        keyword: str,
         difficulty: int,
-        style_modifier: Optional[str] = None,
         custom_api_key: Optional[str] = None,
         custom_model: Optional[str] = None,
     ) -> Dict[str, any]:
         """Generate a multiple-choice question for multiplayer mode with structured JSON response.
+        
+        Multiplayer uses only category + subject + difficulty (no keyword/style).
         
         Returns:
             Dict with keys: question, options (list of 4), correct_answer, explanation
         """
         model = self._get_model(custom_model)
         logger.info(
-            "openai_generate_multiplayer_question_start category=%s subcategory=%s keyword=%s difficulty=%d style_modifier=%s model=%s custom_key=%s",
+            "openai_generate_multiplayer_question_start category=%s subcategory=%s difficulty=%d model=%s custom_key=%s",
             category,
             subcategory,
-            keyword,
             difficulty,
-            style_modifier,
             model,
             "yes" if custom_api_key else "no",
         )
 
         prompt_template = self._multiplayer_prompts[difficulty]
-        difficulty_label = {1: "easy", 2: "intermediate", 3: "advanced"}[difficulty]
         prompt = prompt_template.format(
             category=category,
             subcategory=subcategory,
-            keyword=keyword,
-            difficulty_label=difficulty_label,
-            style_modifier=style_modifier or "general knowledge",
         )
 
         provider = self._get_provider(custom_api_key)
@@ -210,10 +204,9 @@ class AIQuestionService:
                 question_data["explanation"] = ""
             
             logger.info(
-                "openai_generate_multiplayer_question_success category=%s subcategory=%s keyword=%s difficulty=%d tokens_used=%d shuffled=%s->%s",
+                "openai_generate_multiplayer_question_success category=%s subcategory=%s difficulty=%d tokens_used=%d shuffled=%s->%s",
                 category,
                 subcategory,
-                keyword,
                 difficulty,
                 tokens_used,
                 correct_answer_letter,

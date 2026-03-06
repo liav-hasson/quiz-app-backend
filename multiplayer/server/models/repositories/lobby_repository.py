@@ -146,6 +146,20 @@ class LobbyRepository(BaseRepository):
         )
         return result.modified_count > 0
 
+    def reset_lobby(self, lobby_code: str) -> Optional[Dict[str, Any]]:
+        """Reset a completed lobby: set status to waiting and clear all players' ready flags."""
+        self.collection.update_one(
+            {"lobby_code": lobby_code.upper()},
+            {
+                "$set": {
+                    "status": "waiting",
+                    "players.$[].ready": False,
+                    "updated_at": datetime.now()
+                }
+            }
+        )
+        return self.get_lobby_by_code(lobby_code)
+
     def is_all_players_ready(self, lobby_code: str) -> bool:
         lobby = self.get_lobby_by_code(lobby_code)
         if not lobby or not lobby["players"]:

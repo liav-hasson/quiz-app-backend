@@ -66,9 +66,8 @@ PERFECT_ANSWER_PROMPT = (
 MULTIPLAYER_QUESTION_PROMPTS = {
     1: (
         "You are a DevOps quiz teacher creating multiple-choice questions for a multiplayer quiz game.\n\n"
-        "Topic: {subcategory} in {category}\n"
-        "Focus keyword: {keyword}\n"
-        "Question style: {style_modifier}\n"
+        "Category: {category}\n"
+        "Subject: {subcategory}\n"
         "Difficulty: EASY (beginner DevOps student)\n\n"
         "Create a SHORT, CLEAR multiple-choice question that:\n"
         "- Is appropriate for beginner DevOps students\n"
@@ -86,11 +85,10 @@ MULTIPLAYER_QUESTION_PROMPTS = {
         '{{"question": "...", "options": ["Correct answer text without prefix", "Wrong option without prefix", "Wrong option without prefix", "Wrong option without prefix"], "correct_answer": "A"}}\n\n'
         "Do NOT include any markdown, code blocks, or extra text. Output must be pure JSON."
     ),
-    2: (
+    2: ( 
         "You are a DevOps quiz master creating multiple-choice questions for a multiplayer quiz game.\n\n"
-        "Topic: {subcategory} in {category}\n"
-        "Focus keyword: {keyword}\n"
-        "Question style: {style_modifier}\n"
+        "Category: {category}\n"
+        "Subject: {subcategory}\n"
         "Difficulty: MEDIUM (entry-level DevOps engineer)\n\n"
         "Create a PRACTICAL multiple-choice question that:\n"
         "- Is appropriate for entry-level DevOps engineers\n"
@@ -111,9 +109,8 @@ MULTIPLAYER_QUESTION_PROMPTS = {
     ),
     3: (
         "You are a DevOps quiz master creating multiple-choice questions for a multiplayer quiz game.\n\n"
-        "Topic: {subcategory} in {category}\n"
-        "Focus keyword: {keyword}\n"
-        "Question style: {style_modifier}\n"
+        "Category: {category}\n"
+        "Subject: {subcategory}\n"
         "Difficulty: HARD (senior DevOps engineer)\n\n"
         "Create a CHALLENGING multiple-choice question that:\n"
         "- Is appropriate for senior DevOps engineers\n"

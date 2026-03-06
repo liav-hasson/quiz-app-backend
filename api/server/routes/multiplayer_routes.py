@@ -10,6 +10,7 @@ Architecture:
 from __future__ import annotations
 
 import logging
+import random
 from functools import wraps
 from typing import Optional
 
@@ -393,6 +394,38 @@ def leave_lobby(lobby_code: str):
         return jsonify({"error": "Failed to leave lobby"}), 500
 
 
+@multiplayer_bp.route("/lobby/<lobby_code>/reset", methods=["POST"])
+@multiplayer_authenticated
+def reset_lobby(lobby_code: str):
+    """Reset a completed lobby back to waiting state (host only)."""
+    try:
+        user = g.user
+        user_id = str(user["_id"])
+        lobby_code = lobby_code.upper()
+
+        lobby_repository = get_lobby_repository()
+        if not lobby_repository:
+            return jsonify({"error": "Service not initialized"}), 503
+
+        lobby = lobby_repository.get_lobby_by_code(lobby_code)
+        if not lobby:
+            return jsonify({"error": "Lobby not found"}), 404
+
+        if lobby.get("creator_id") != user_id:
+            return jsonify({"error": "Only the host can reset the lobby"}), 403
+
+        if lobby.get("status") not in ("completed", "in_progress"):
+            return jsonify({"error": "Lobby is not in a finished state"}), 400
+
+        updated_lobby = lobby_repository.reset_lobby(lobby_code)
+        logger.info("lobby_reset code=%s host=%s", lobby_code, user["username"])
+        return jsonify({"lobby": serialize_lobby(updated_lobby)}), 200
+
+    except Exception as e:
+        logger.error("reset_lobby_failed code=%s error=%s", lobby_code, e, exc_info=True)
+        return jsonify({"error": "Failed to reset lobby"}), 500
+
+
 @multiplayer_bp.route("/lobby/<lobby_code>/ready", methods=["POST"])
 @multiplayer_authenticated
 def toggle_ready(lobby_code: str):
@@ -740,28 +773,26 @@ def create_game_session():
         
         for question_set in question_list:
             category = question_set.get("category")
-            subject = question_set.get("subject")  # This is the subcategory
+            subject = question_set.get("subject")  # Optional — if absent, pick random
             difficulty = question_set.get("difficulty", lobby.get("difficulty", 2))
             count = question_set.get("count", 1)
             
             for i in range(count):
                 try:
-                    # Get random keyword and style modifier for variety (like singleplayer)
-                    keyword = quiz_controller.get_random_keyword(category, subject)
-                    style_modifier = quiz_controller.get_random_style_modifier(category, subject)
-                    
-                    # No fallbacks - should raise error if keywords/style_modifiers missing
-                    if not keyword:
-                        raise ValueError(f"No keywords found for category={category} subject={subject}")
-                    if not style_modifier:
-                        raise ValueError(f"No style_modifiers found for category={category} subject={subject}")
-                    
+                    # Pick a random subject from this category
+                    current_subject = subject
+                    if not current_subject:
+                        available_subjects = quiz_controller._quiz_repository.get_subtopics_by_topic(category)
+                        if not available_subjects:
+                            raise ValueError(f"No subjects found for category={category}")
+                        current_subject = random.choice(available_subjects)
+                        logger.debug("random_subject_selected category=%s subject=%s", category, current_subject)
+
+                    # Multiplayer: no keyword/style — broader questions for fast-paced play
                     question_data = ai_service.generate_multiplayer_question(
                         category=category,
-                        subcategory=subject,
-                        keyword=keyword,
+                        subcategory=current_subject,
                         difficulty=difficulty,
-                        style_modifier=style_modifier,
                         custom_api_key=custom_api_key,
                         custom_model=custom_model,
                     )
@@ -770,7 +801,7 @@ def create_game_session():
                         "options": question_data["options"],
                         "correct_answer": question_data["correct_answer"],
                         "category": category,
-                        "subcategory": subject,
+                        "subcategory": current_subject,
                         "difficulty": difficulty
                     })
                 except Exception as e:
