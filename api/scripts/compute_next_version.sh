@@ -4,27 +4,31 @@ set -euo pipefail
 # compute_next_version.sh
 # Compute the next semantic version tag based on commit-message prefixes or explicit bump
 # Usage:
-#   compute_next_version.sh <repo-dir> <mode>
+#   compute_next_version.sh <repo-dir> <mode> [tag-prefix]
 # Modes:
 #   auto   - scan commit messages since the last semver tag for prefixes (major:/minor:/patch:)
 #   major  - bump major
 #   minor  - bump minor
 #   patch  - bump patch (default)
+# Tag prefix:
+#   Optional prefix for git tags (e.g. "api-" → tags like api-v1.2.3). Default: no prefix.
 # Environment:
 #   If COMMIT_MESSAGES is set, the script will use that value (newline-separated) instead of running git.
 # Output:
-#   Prints the new tag (e.g. v1.2.3) to stdout. Also prints diagnostic info to stderr.
+#   Prints the new tag (e.g. api-v1.2.3) to stdout. Also prints diagnostic info to stderr.
 
 REPO_DIR="${1:-.}"
 MODE="${2:-patch}"
+TAG_PREFIX="${3:-}"
 
 cd "$REPO_DIR"
 
 # Helper: get latest semver tag from git repository
 get_latest_tag() {
-  # Get all semver tags and sort by version to find the highest
+  # Get all semver tags (with optional prefix) and sort by version to find the highest
   # Use sort -V for proper version sorting (v1.0.0 > v0.0.1)
-  local git_tag=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" | sort -V | tail -n1 || echo "")
+  local pattern="${TAG_PREFIX}v[0-9]*.[0-9]*.[0-9]*"
+  local git_tag=$(git tag -l "$pattern" | sort -V | tail -n1 || echo "")
   
   if [[ -n "$git_tag" ]]; then
     echo "$git_tag"
@@ -38,6 +42,8 @@ get_latest_tag() {
 # Parse tag into MAJOR MINOR PATCH
 parse_tag() {
   local tag="${1:-v0.0.0}"
+  # Strip prefix and 'v'
+  tag=${tag#"${TAG_PREFIX}"}
   tag=${tag#v}
   IFS='.' read -r MAJOR MINOR PATCH <<< "$tag"
   MAJOR=${MAJOR:-0}
@@ -142,7 +148,7 @@ case "$BUMP" in
     ;;
 esac
 
-NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+NEW_TAG="${TAG_PREFIX}v${MAJOR}.${MINOR}.${PATCH}"
 
 echo "[compute_next_version] Computed version: $LATEST_TAG → $NEW_TAG (bump: $BUMP)" >&2
 echo "$NEW_TAG"
