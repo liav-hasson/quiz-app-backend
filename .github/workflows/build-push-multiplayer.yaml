@@ -74,7 +74,6 @@ jobs:
           echo "- **Update Helm chart tag to:** \`${{ steps.version.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
 
       - name: Update homelab chart version
-        if: ${{ secrets.HOMELAB_PAT != '' }}
         env:
           HOMELAB_PAT: ${{ secrets.HOMELAB_PAT }}
           VERSION: ${{ steps.version.outputs.tag }}
