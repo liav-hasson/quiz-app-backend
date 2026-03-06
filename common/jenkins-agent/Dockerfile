@@ -1,3 +1,4 @@
+# --- DEPRICATED --- #
 # -----------------------------
 # Jenkins agent dockerfile
 # Image used by both backend microservices

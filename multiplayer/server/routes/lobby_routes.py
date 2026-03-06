@@ -113,5 +113,5 @@ def init_lobby_routes(lobby_controller):
             return jsonify({'history': history}), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
-    
+
     return lobby_bp

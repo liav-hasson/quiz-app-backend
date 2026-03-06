@@ -115,21 +115,21 @@ class AIQuestionService:
         category: str,
         subcategory: str,
         difficulty: int,
+        keyword: str = "",
         custom_api_key: Optional[str] = None,
         custom_model: Optional[str] = None,
     ) -> Dict[str, any]:
         """Generate a multiple-choice question for multiplayer mode with structured JSON response.
-        
-        Multiplayer uses only category + subject + difficulty (no keyword/style).
         
         Returns:
             Dict with keys: question, options (list of 4), correct_answer, explanation
         """
         model = self._get_model(custom_model)
         logger.info(
-            "openai_generate_multiplayer_question_start category=%s subcategory=%s difficulty=%d model=%s custom_key=%s",
+            "openai_generate_multiplayer_question_start category=%s subcategory=%s keyword=%s difficulty=%d model=%s custom_key=%s",
             category,
             subcategory,
+            keyword,
             difficulty,
             model,
             "yes" if custom_api_key else "no",
@@ -139,6 +139,7 @@ class AIQuestionService:
         prompt = prompt_template.format(
             category=category,
             subcategory=subcategory,
+            keyword=keyword or subcategory,
         )
 
         provider = self._get_provider(custom_api_key)
@@ -146,7 +147,7 @@ class AIQuestionService:
             model=model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=settings.openai_max_tokens_question + 100,  # Slightly more tokens for structured output
-            temperature=settings.openai_temperature_question,
+            temperature=0.9,  # Higher temperature for multiplayer variety
             response_format={"type": "json_object"},  # Enforce JSON response
         )
         content = response.choices[0].message.content

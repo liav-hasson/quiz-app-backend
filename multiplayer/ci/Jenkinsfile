@@ -1,3 +1,5 @@
+// --- DEPRICATED --- //
+//
 pipeline {
     agent {
         kubernetes {

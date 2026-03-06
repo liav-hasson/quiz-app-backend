@@ -788,11 +788,14 @@ def create_game_session():
                         current_subject = random.choice(available_subjects)
                         logger.debug("random_subject_selected category=%s subject=%s", category, current_subject)
 
-                    # Multiplayer: no keyword/style — broader questions for fast-paced play
+                    # Pick a random keyword from the subject for variety
+                    keyword = quiz_controller.get_random_keyword(category, current_subject) or current_subject
+
                     question_data = ai_service.generate_multiplayer_question(
                         category=category,
                         subcategory=current_subject,
                         difficulty=difficulty,
+                        keyword=keyword,
                         custom_api_key=custom_api_key,
                         custom_model=custom_model,
                     )
