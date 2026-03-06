@@ -2,6 +2,7 @@
 
 import logging
 import os
+import requests as http_requests
 from typing import Callable, Optional, Tuple
 
 from flask import Blueprint, jsonify
@@ -95,6 +96,7 @@ def health():
     response = {
         "status": "ok" if overall_healthy else "degraded",
         "version": os.environ.get("APP_VERSION", "dev"),
+        "multiplayer_version": _get_multiplayer_version(),
         "dependencies": {
             name: {"healthy": healthy, "details": details}
             for name, (healthy, details) in dependency_results.items()
@@ -102,3 +104,16 @@ def health():
     }
 
     return jsonify(response)
+
+
+def _get_multiplayer_version() -> str:
+    """Fetch multiplayer service version via internal health endpoint."""
+    try:
+        mp_host = os.environ.get("MULTIPLAYER_HOST", "quiz-multiplayer.quiz-multiplayer.svc.cluster.local")
+        mp_port = os.environ.get("MULTIPLAYER_PORT", "5001")
+        resp = http_requests.get(f"http://{mp_host}:{mp_port}/api/health", timeout=2)
+        if resp.ok:
+            return resp.json().get("version", "unknown")
+    except Exception:
+        pass
+    return "unknown"

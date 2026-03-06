@@ -72,3 +72,21 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Image:** \`${{ env.DOCKER_IMAGE }}:${{ steps.version.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Update Helm chart tag to:** \`${{ steps.version.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Update homelab chart version
+        if: ${{ secrets.HOMELAB_PAT != '' }}
+        env:
+          HOMELAB_PAT: ${{ secrets.HOMELAB_PAT }}
+          VERSION: ${{ steps.version.outputs.tag }}
+        run: |
+          git clone https://x-access-token:${HOMELAB_PAT}@github.com/liav-hasson/homelab.git /tmp/homelab
+          cd /tmp/homelab
+          VALUES=quizlabs/charts/workloads/quiz-multiplayer/values.yaml
+          sed -i "s|^\(  tag: \).*|\1\"${VERSION}\"|" "$VALUES"
+          sed -i "/APP_VERSION/{n;s|value: .*|value: \"${VERSION}\"|;}" "$VALUES"
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add "$VALUES"
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "bump: quiz-multiplayer ${VERSION}"
+          git push origin main

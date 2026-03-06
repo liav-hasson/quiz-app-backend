@@ -223,8 +223,13 @@ def run_game_loop(socketio, app, lobby_code):
                                            lobby_code, question_index + 1, answered_count, player_count)
                             
                             if answered_count >= player_count and player_count > 0:
-                                logger.info("all_players_answered lobby=%s question=%d elapsed=%.1f", 
+                                logger.info("all_players_answered lobby=%s question=%d elapsed=%.1f cooldown=3s", 
                                            lobby_code, question_index + 1, elapsed)
+                                # 3-second cooldown so players can review their answers
+                                remaining = question_timer - elapsed
+                                cooldown = min(3.0, remaining)  # don't exceed remaining time
+                                if cooldown > 0:
+                                    time.sleep(cooldown)
                                 break
                     
                     # End question and show results
