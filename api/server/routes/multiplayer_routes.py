@@ -412,7 +412,10 @@ def reset_lobby(lobby_code: str):
             return jsonify({"error": "Lobby not found"}), 404
 
         if lobby.get("creator_id") != user_id:
-            return jsonify({"error": "Only the host can reset the lobby"}), 403
+            # Not the host — check if at least a member
+            player_ids = [p['user_id'] for p in lobby.get('players', [])]
+            if user_id not in player_ids:
+                return jsonify({"error": "You are not a member of this lobby"}), 403
 
         if lobby.get("status") not in ("completed", "in_progress"):
             return jsonify({"error": "Lobby is not in a finished state"}), 400
