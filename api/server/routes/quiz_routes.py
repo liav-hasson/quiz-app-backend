@@ -335,6 +335,41 @@ def test_ai_configuration():
             }), 500
 
 
+@quiz_bp.route("/ai/models", methods=["GET"])
+def list_available_models():
+    """List available OpenAI models using the user's API key.
+
+    Reads the API key from the X-OpenAI-API-Key header (or falls back to
+    the server key) and returns chat-capable model IDs sorted alphabetically.
+    """
+    from common.utils.ai import OpenAIProvider
+    from common.utils.config import get_settings
+
+    custom_api_key, _ = _get_custom_ai_settings()
+    settings = get_settings()
+
+    has_api_key = bool(custom_api_key or settings.openai_api_key or settings.openai_ssm_parameter_name)
+    if not has_api_key:
+        return jsonify({"error": "No API key available", "models": []}), 400
+
+    try:
+        provider = OpenAIProvider(api_key=custom_api_key) if custom_api_key else OpenAIProvider()
+        client = provider.get_client()
+        models_response = client.models.list()
+
+        # Filter to chat-capable models (gpt-*, o1-*, o3-*, chatgpt-*)
+        chat_models = sorted(
+            m.id for m in models_response.data
+            if any(m.id.startswith(p) for p in ("gpt-", "o1", "o3", "o4", "chatgpt-"))
+        )
+
+        return jsonify({"models": chat_models}), 200
+
+    except Exception as e:
+        logger.error("list_models_failed error=%s", e)
+        return jsonify({"error": str(e), "models": []}), 500
+
+
 @quiz_bp.route("/quiz/perfect-answer", methods=["POST"])
 def generate_perfect_answer():
     """Generate a perfect 10/10 answer for a given question.
