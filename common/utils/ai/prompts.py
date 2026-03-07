@@ -118,7 +118,6 @@ MULTIPLAYER_QUESTION_PROMPTS = {
         "Focus style: concept knowledge, comparison or purpose\n"
         "Difficulty: MEDIUM (appropriate for a junior DevOps engineer)\n\n"
         "Create a multiple-choice question that:\n"
-        "- Uses a \"What is...\", \"Which...\", or \"How does...\" question style\n"
         "- The question MUST be under 25 words and contain the focus keyword\n"
         "- Each answer option MUST be under 15 words\n"
         "- Has exactly 4 answer options\n"
