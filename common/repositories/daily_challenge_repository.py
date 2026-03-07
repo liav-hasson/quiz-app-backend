@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 
 from .base_repository import BaseRepository
 
@@ -93,3 +93,71 @@ class DailyChallengeRepository(BaseRepository):
             }
             for a in answers[:limit]
         ]
+
+    # --- Streak tracking ---
+
+    def _streak_collection(self):
+        """Access the daily_streaks collection."""
+        return self.db_controller.db["daily_streaks"]
+
+    def get_user_streak(self, user_id: str) -> Dict[str, Any]:
+        """Get a user's current daily challenge streak."""
+        doc = self._streak_collection().find_one({"user_id": user_id})
+        if not doc:
+            return {"current_streak": 0, "max_streak": 0, "active": False}
+
+        today = self._today_key()
+        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+        last_date = doc.get("last_completed_date", "")
+
+        # Active if they answered today or yesterday (still have a chance today)
+        active = last_date in (today, yesterday)
+
+        return {
+            "current_streak": doc.get("current_streak", 0) if active else 0,
+            "max_streak": doc.get("max_streak", 0),
+            "active": last_date == today,  # True only if answered today
+        }
+
+    def update_user_streak(self, user_id: str) -> int:
+        """Update a user's streak after answering today's challenge. Returns new streak."""
+        today = self._today_key()
+        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+        col = self._streak_collection()
+
+        doc = col.find_one({"user_id": user_id})
+
+        if not doc:
+            # First ever daily challenge
+            col.insert_one({
+                "user_id": user_id,
+                "current_streak": 1,
+                "max_streak": 1,
+                "last_completed_date": today,
+            })
+            return 1
+
+        last_date = doc.get("last_completed_date", "")
+
+        if last_date == today:
+            # Already updated today
+            return doc.get("current_streak", 1)
+
+        if last_date == yesterday:
+            # Consecutive day — increment
+            new_streak = doc.get("current_streak", 0) + 1
+        else:
+            # Streak broken — reset to 1
+            new_streak = 1
+
+        new_max = max(new_streak, doc.get("max_streak", 0))
+
+        col.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "current_streak": new_streak,
+                "max_streak": new_max,
+                "last_completed_date": today,
+            }},
+        )
+        return new_streak

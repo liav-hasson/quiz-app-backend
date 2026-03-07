@@ -6,6 +6,7 @@ from typing import Optional
 from flask import Blueprint, request, jsonify, g
 from common.repositories.daily_challenge_repository import DailyChallengeRepository
 from common.repositories.quiz_repository import QuizRepository
+from common.repositories.user_repository import UserRepository
 from common.utils.ai import get_service
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,7 @@ daily_challenge_bp = Blueprint("daily_challenge", __name__, url_prefix="/api/dai
 # Set during init
 _challenge_repo: Optional[DailyChallengeRepository] = None
 _quiz_repo: Optional[QuizRepository] = None
+_user_repo: Optional[UserRepository] = None
 
 XP_REWARD = 50  # XP everyone who completes the daily gets
 
@@ -22,10 +24,12 @@ XP_REWARD = 50  # XP everyone who completes the daily gets
 def init_daily_challenge_routes(
     challenge_repo: DailyChallengeRepository,
     quiz_repo: QuizRepository,
+    user_repo: UserRepository = None,
 ) -> None:
-    global _challenge_repo, _quiz_repo
+    global _challenge_repo, _quiz_repo, _user_repo
     _challenge_repo = challenge_repo
     _quiz_repo = quiz_repo
+    _user_repo = user_repo
 
 
 def _get_custom_ai_settings():
@@ -82,8 +86,10 @@ def get_daily_challenge():
 
         # Check if user already answered
         user_answer = None
+        streak_data = {"current_streak": 0, "active": False}
         if user_id:
             user_answer = _challenge_repo.get_user_answer_today(user_id)
+            streak_data = _challenge_repo.get_user_streak(user_id)
 
         return jsonify({
             "date": challenge["date"],
@@ -91,6 +97,7 @@ def get_daily_challenge():
             "already_answered": user_answer is not None,
             "user_answer": user_answer,
             "xp_reward": XP_REWARD,
+            "streak": streak_data,
         }), 200
 
     except Exception as e:
@@ -148,14 +155,27 @@ def submit_daily_answer():
             feedback=feedback,
         )
 
+        # Auto-award XP
+        xp_awarded = False
+        if _user_repo:
+            xp_awarded = _user_repo.add_bonus_xp(user_id, XP_REWARD)
+
+        # Update daily streak
+        streak = 0
+        if _challenge_repo:
+            streak = _challenge_repo.update_user_streak(user_id)
+
         logger.info(
-            "daily_challenge_answered user=%s score=%s", user_id, score
+            "daily_challenge_answered user=%s score=%s xp_awarded=%s streak=%s",
+            user_id, score, xp_awarded, streak,
         )
 
         return jsonify({
             "score": score,
             "feedback": feedback,
             "xp_reward": XP_REWARD,
+            "xp_awarded": xp_awarded,
+            "streak": streak,
         }), 200
 
     except Exception as e:
@@ -171,4 +191,20 @@ def get_daily_leaderboard():
         return jsonify({"leaderboard": leaderboard}), 200
     except Exception as e:
         logger.error("daily_leaderboard_failed error=%s", e, exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@daily_challenge_bp.route("/streak", methods=["GET"])
+def get_daily_streak():
+    """Return the current user's daily challenge streak."""
+    user = getattr(g, "user", None)
+    if not user:
+        return jsonify({"error": "Authentication required"}), 401
+
+    user_id = user.get("_id")
+    try:
+        streak_data = _challenge_repo.get_user_streak(user_id)
+        return jsonify(streak_data), 200
+    except Exception as e:
+        logger.error("daily_streak_get_failed error=%s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500

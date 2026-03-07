@@ -195,7 +195,7 @@ def initialize_routes(app: Flask) -> None:
 
     # Initialize daily challenge routes
     daily_challenge_repository = app.extensions["daily_challenge_repository"]
-    init_daily_challenge_routes(daily_challenge_repository, quiz_repository)
+    init_daily_challenge_routes(daily_challenge_repository, quiz_repository, user_repository)
 
     # Register blueprints
     app.register_blueprint(health_bp)
