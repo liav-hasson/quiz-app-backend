@@ -172,6 +172,7 @@ def run_game_loop(socketio, app, lobby_code):
                     # Update current question index in Redis
                     game_state['current_question_index'] = question_index
                     game_state['current_question'] = question
+                    game_state['question_start_time'] = time.time()
                     redis_client.set_game_state(lobby_code, game_state, ttl_seconds=3600)
                     
                     # Emit QUESTION_SENT directly (don't publish to Redis to avoid duplicate relay)

@@ -5,6 +5,7 @@ These handlers receive game events via Redis pub/sub and can also
 handle real-time player actions that need immediate feedback.
 """
 
+import time
 import logging
 from flask import request, current_app
 from flask_socketio import emit
@@ -182,3 +183,143 @@ def register_handlers(socketio):
         except Exception as e:
             logger.error("request_scores_failed error=%s", e)
             emit('error', {'message': f'Failed to get scores: {str(e)}'})
+
+    @socketio.on('rejoin_game')
+    @socket_authenticated
+    def handle_rejoin_game(user, data):
+        """Handle a player trying to rejoin an active game.
+        
+        Validates the user is a member of the lobby, then returns the
+        current game state from Redis so the client can hydrate and resume.
+        
+        Expected data: {
+            "lobby_code": "ABC123"
+        }
+        """
+        try:
+            lobby_code = data.get('lobby_code', '').upper()
+            
+            if not lobby_code:
+                emit('rejoin_game_response', {'status': 'error', 'message': 'Lobby code required'})
+                return
+            
+            redis_client = current_app.extensions.get('redis_client')
+            if not redis_client:
+                emit('rejoin_game_response', {'status': 'error', 'message': 'Service unavailable'})
+                return
+            
+            user_id = str(user.get('_id', ''))
+            
+            # Validate user is a member of this lobby via API
+            import requests
+            import os
+            from common.utils.config import settings
+            
+            internal_secret = os.environ.get("INTERNAL_SERVICE_SECRET")
+            if not internal_secret:
+                emit('rejoin_game_response', {'status': 'error', 'message': 'Service misconfigured'})
+                return
+            
+            api_url = f"http://{settings.api_host}:{settings.api_port}/api/multiplayer/lobby/{lobby_code}"
+            lobby_response = requests.get(api_url, headers={
+                "X-Internal-Secret": internal_secret
+            }, timeout=5)
+            
+            if lobby_response.status_code != 200:
+                emit('rejoin_game_response', {'status': 'ended', 'message': 'Lobby not found'})
+                return
+            
+            lobby = lobby_response.json().get('lobby')
+            if not lobby:
+                emit('rejoin_game_response', {'status': 'ended', 'message': 'Lobby not found'})
+                return
+            
+            # Check that user is actually a member of this lobby
+            player_ids = [p['user_id'] for p in lobby.get('players', [])]
+            if user_id not in player_ids:
+                logger.warning("rejoin_denied_not_member user=%s lobby=%s", user.get('username'), lobby_code)
+                emit('rejoin_game_response', {'status': 'error', 'message': 'You are not a member of this lobby'})
+                return
+            
+            # Check lobby status
+            lobby_status = lobby.get('status', '')
+            if lobby_status == 'completed':
+                emit('rejoin_game_response', {'status': 'ended', 'message': 'Game has ended'})
+                return
+            
+            if lobby_status != 'in_progress':
+                emit('rejoin_game_response', {'status': 'ended', 'message': 'No active game'})
+                return
+            
+            # Get game state from Redis
+            game_state = redis_client.get_game_state(lobby_code)
+            if not game_state:
+                emit('rejoin_game_response', {'status': 'ended', 'message': 'Game state not found'})
+                return
+            
+            # Join the socket room so they receive future events
+            from flask_socketio import join_room
+            join_room(lobby_code)
+            
+            # Calculate time remaining for current question
+            question_timer = game_state.get('question_timer', 30)
+            question_start_time = game_state.get('question_start_time')
+            if question_start_time:
+                elapsed = time.time() - question_start_time
+                time_remaining = max(0, round(question_timer - elapsed))
+            else:
+                time_remaining = question_timer
+            
+            # Check if this player already answered the current question
+            current_question_index = game_state.get('current_question_index', -1)
+            player_answers = game_state.get('player_answers', {})
+            user_answers = player_answers.get(user_id, [])
+            has_answered = any(
+                a.get('question_index') == current_question_index for a in user_answers
+            )
+            
+            # Get the current question (without leaking correct answer if not answered)
+            current_question = game_state.get('current_question')
+            question_data = None
+            if current_question and current_question_index >= 0:
+                question_data = {
+                    'question': current_question.get('question_text', ''),
+                    'options': current_question.get('options', []),
+                    'category': current_question.get('category', 'General'),
+                    'difficulty': current_question.get('difficulty', 2),
+                    'question_number': current_question_index + 1,
+                    'total_questions': game_state.get('total_questions', 0),
+                    'time_limit': question_timer,
+                }
+            
+            # Build standings
+            player_scores = game_state.get('player_scores', {})
+            standings = []
+            for player in lobby.get('players', []):
+                pid = player['user_id']
+                p_answers = player_answers.get(pid, [])
+                correct_count = sum(1 for a in p_answers if a.get('is_correct', False))
+                standings.append({
+                    'user_id': pid,
+                    'username': player['username'],
+                    'score': player_scores.get(pid, 0),
+                    'correct_answers': correct_count,
+                })
+            standings.sort(key=lambda x: x['score'], reverse=True)
+            
+            logger.info("rejoin_game_success user=%s lobby=%s question=%d/%d time_remaining=%d has_answered=%s",
+                        user.get('username'), lobby_code, current_question_index + 1,
+                        game_state.get('total_questions', 0), time_remaining, has_answered)
+            
+            emit('rejoin_game_response', {
+                'status': 'active',
+                'question': question_data,
+                'time_remaining': time_remaining,
+                'has_answered': has_answered,
+                'standings': standings,
+                'total_questions': game_state.get('total_questions', 0),
+            })
+            
+        except Exception as e:
+            logger.error("rejoin_game_failed user=%s error=%s", user.get('username', '?'), str(e), exc_info=True)
+            emit('rejoin_game_response', {'status': 'error', 'message': f'Rejoin failed: {str(e)}'})
