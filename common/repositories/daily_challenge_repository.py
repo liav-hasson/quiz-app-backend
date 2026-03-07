@@ -98,7 +98,7 @@ class DailyChallengeRepository(BaseRepository):
 
     def _streak_collection(self):
         """Access the daily_streaks collection."""
-        return self.db_controller.db["daily_streaks"]
+        return self._db_controller.db["daily_streaks"]
 
     def get_user_streak(self, user_id: str) -> Dict[str, Any]:
         """Get a user's current daily challenge streak."""
