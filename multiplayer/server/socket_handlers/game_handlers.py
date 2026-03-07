@@ -274,11 +274,12 @@ def register_handlers(socketio):
             current_question_index = game_state.get('current_question_index', -1)
             player_answers = game_state.get('player_answers', {})
             user_answers = player_answers.get(user_id, [])
-            has_answered = any(
-                a.get('question_index') == current_question_index for a in user_answers
+            current_answer = next(
+                (a for a in user_answers if a.get('question_index') == current_question_index), None
             )
+            has_answered = current_answer is not None
             
-            # Get the current question (without leaking correct answer if not answered)
+            # Get the current question
             current_question = game_state.get('current_question')
             question_data = None
             if current_question and current_question_index >= 0:
@@ -291,6 +292,9 @@ def register_handlers(socketio):
                     'total_questions': game_state.get('total_questions', 0),
                     'time_limit': question_timer,
                 }
+                # Include answer details if player already answered
+                if has_answered:
+                    question_data['correct_answer'] = current_question.get('correct_answer', '')
             
             # Build standings
             player_scores = game_state.get('player_scores', {})
@@ -311,14 +315,22 @@ def register_handlers(socketio):
                         user.get('username'), lobby_code, current_question_index + 1,
                         game_state.get('total_questions', 0), time_remaining, has_answered)
             
-            emit('rejoin_game_response', {
+            response_data = {
                 'status': 'active',
                 'question': question_data,
                 'time_remaining': time_remaining,
                 'has_answered': has_answered,
                 'standings': standings,
                 'total_questions': game_state.get('total_questions', 0),
-            })
+            }
+            # Include answer details so frontend can show feedback
+            if has_answered and current_answer:
+                response_data['answer_details'] = {
+                    'answer': current_answer.get('answer', ''),
+                    'is_correct': current_answer.get('is_correct', False),
+                    'points': current_answer.get('points', 0),
+                }
+            emit('rejoin_game_response', response_data)
             
         except Exception as e:
             logger.error("rejoin_game_failed user=%s error=%s", user.get('username', '?'), str(e), exc_info=True)
