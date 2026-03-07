@@ -5,6 +5,9 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
+
+ISRAEL_TZ = ZoneInfo("Asia/Jerusalem")
 
 from .base_repository import BaseRepository
 
@@ -19,8 +22,8 @@ class DailyChallengeRepository(BaseRepository):
 
     @staticmethod
     def _today_key() -> str:
-        """Return today's date as a string key in UTC (YYYY-MM-DD)."""
-        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        """Return today's date as a string key in Israel time (YYYY-MM-DD)."""
+        return datetime.now(ISRAEL_TZ).strftime("%Y-%m-%d")
 
     def get_today_challenge(self) -> Optional[Dict[str, Any]]:
         """Get today's daily challenge, or None if it hasn't been generated yet."""
@@ -104,10 +107,14 @@ class DailyChallengeRepository(BaseRepository):
         """Get a user's current daily challenge streak."""
         doc = self._streak_collection().find_one({"user_id": user_id})
         if not doc:
+            # Backfill: if user answered today but has no streak doc (pre-refactor)
+            if self.get_user_answer_today(user_id):
+                new_streak = self.update_user_streak(user_id)
+                return {"current_streak": new_streak, "max_streak": new_streak, "active": True}
             return {"current_streak": 0, "max_streak": 0, "active": False}
 
         today = self._today_key()
-        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+        yesterday = (datetime.now(ISRAEL_TZ) - timedelta(days=1)).strftime("%Y-%m-%d")
         last_date = doc.get("last_completed_date", "")
 
         # Active if they answered today or yesterday (still have a chance today)
@@ -122,7 +129,7 @@ class DailyChallengeRepository(BaseRepository):
     def update_user_streak(self, user_id: str) -> int:
         """Update a user's streak after answering today's challenge. Returns new streak."""
         today = self._today_key()
-        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+        yesterday = (datetime.now(ISRAEL_TZ) - timedelta(days=1)).strftime("%Y-%m-%d")
         col = self._streak_collection()
 
         doc = col.find_one({"user_id": user_id})
