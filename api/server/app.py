@@ -34,6 +34,7 @@ from common.repositories.questions_repository import QuestionsRepository
 from common.repositories.leaderboard_repository import LeaderboardRepository
 from common.repositories.quiz_repository import QuizRepository
 from common.repositories.lobby_repository import LobbyRepository
+from common.repositories.daily_challenge_repository import DailyChallengeRepository
 from models.data_migrator import DataMigrator
 from common.utils.identity import TokenService, GoogleTokenVerifier
 
@@ -43,6 +44,7 @@ from routes.quiz_routes import quiz_bp, init_quiz_routes
 from routes.auth_routes import auth_bp, init_auth_routes
 from routes.user_activity_routes import user_activity_bp, init_user_activity_routes
 from routes.multiplayer_routes import multiplayer_bp, init_multiplayer_routes
+from routes.daily_challenge_routes import daily_challenge_bp, init_daily_challenge_routes
 
 # Configure logging
 logging.basicConfig(
@@ -74,6 +76,7 @@ def initialize_database(app: Flask) -> bool:
         questions_repository = QuestionsRepository(db_controller)
         leaderboard_repository = LeaderboardRepository(db_controller)
         lobby_repository = LobbyRepository(db_controller)
+        daily_challenge_repository = DailyChallengeRepository(db_controller)
 
         # Ensure MongoDB indexes are created for lobbies
         # This creates: unique index on lobby_code, TTL index on expire_at
@@ -134,6 +137,7 @@ def initialize_database(app: Flask) -> bool:
         app.extensions["questions_repository"] = questions_repository
         app.extensions["leaderboard_repository"] = leaderboard_repository
         app.extensions["lobby_repository"] = lobby_repository
+        app.extensions["daily_challenge_repository"] = daily_challenge_repository
         app.extensions["token_service"] = token_service
         app.extensions["google_token_verifier"] = google_token_verifier
         app.extensions["oauth"] = oauth
@@ -189,12 +193,17 @@ def initialize_routes(app: Flask) -> None:
     lobby_repository = app.extensions["lobby_repository"]
     init_multiplayer_routes(lobby_repository, quiz_repository)
 
+    # Initialize daily challenge routes
+    daily_challenge_repository = app.extensions["daily_challenge_repository"]
+    init_daily_challenge_routes(daily_challenge_repository, quiz_repository)
+
     # Register blueprints
     app.register_blueprint(health_bp)
     app.register_blueprint(quiz_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(user_activity_bp)
     app.register_blueprint(multiplayer_bp)
+    app.register_blueprint(daily_challenge_bp)
 
     logger.info("All routes registered successfully")
 
