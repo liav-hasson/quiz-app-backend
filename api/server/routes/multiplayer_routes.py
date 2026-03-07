@@ -371,6 +371,8 @@ def leave_lobby(lobby_code: str):
                 new_creator = updated_lobby["players"][0]
                 lobby_repository.reassign_creator(lobby_code, new_creator["user_id"])
                 result["new_creator_id"] = new_creator["user_id"]
+                # Re-fetch lobby so event data has the updated creator_id
+                updated_lobby = lobby_repository.get_lobby_by_code(lobby_code)
 
             # Publish player left event
             publish_lobby_event(
@@ -837,6 +839,9 @@ def create_game_session():
         
         result = get_db_controller().get_collection("multiplayer_game_sessions").insert_one(session_doc)
         session_id = str(result.inserted_id)
+        
+        # Update lobby status to in_progress now that game session exists
+        lobby_repository.update_lobby_status(lobby_code, "in_progress")
         
         logger.info("game_session_created session_id=%s lobby=%s questions=%d",
                     session_id, lobby_code, len(questions))
