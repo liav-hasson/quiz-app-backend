@@ -87,3 +87,61 @@ def guest_login():
 
     response_data, status_code = auth_controller.handle_guest_login(username)
     return jsonify(response_data), status_code
+
+
+@auth_bp.route("/register", methods=["POST"])
+def credential_register():
+    """Register a new account with username + password.
+
+    Request Body:
+        username (str): 2-30 characters (letters, numbers, _ and -)
+        password (str): Must meet strength requirements
+
+    Returns:
+        JSON with user data and JWT token, or error message
+    """
+    import re
+
+    if auth_controller is None:
+        return jsonify({"error": "Service not initialized"}), 503
+
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+
+    if not username or not password:
+        return jsonify({"error": "Username and password are required"}), 400
+
+    if len(username) < 2 or len(username) > 30:
+        return jsonify({"error": "Username must be 2-30 characters"}), 400
+
+    if not re.match(r"^[a-zA-Z0-9_-]+$", username):
+        return jsonify({"error": "Username can only contain letters, numbers, underscores, and hyphens"}), 400
+
+    response_data, status_code = auth_controller.handle_credential_register(username, password)
+    return jsonify(response_data), status_code
+
+
+@auth_bp.route("/login", methods=["POST"])
+def credential_login():
+    """Log in with username + password.
+
+    Request Body:
+        username (str): The account username
+        password (str): The account password
+
+    Returns:
+        JSON with user data and JWT token, or error message
+    """
+    if auth_controller is None:
+        return jsonify({"error": "Service not initialized"}), 503
+
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+
+    if not username or not password:
+        return jsonify({"error": "Username and password are required"}), 400
+
+    response_data, status_code = auth_controller.handle_credential_login(username, password)
+    return jsonify(response_data), status_code

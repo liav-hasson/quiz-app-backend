@@ -45,6 +45,7 @@ from routes.auth_routes import auth_bp, init_auth_routes
 from routes.user_activity_routes import user_activity_bp, init_user_activity_routes
 from routes.multiplayer_routes import multiplayer_bp, init_multiplayer_routes
 from routes.daily_challenge_routes import daily_challenge_bp, init_daily_challenge_routes
+from routes.account_routes import account_bp, init_account_routes
 
 # Configure logging
 logging.basicConfig(
@@ -197,6 +198,9 @@ def initialize_routes(app: Flask) -> None:
     daily_challenge_repository = app.extensions["daily_challenge_repository"]
     init_daily_challenge_routes(daily_challenge_repository, quiz_repository, user_repository)
 
+    # Initialize account management routes
+    init_account_routes(user_repository, questions_repository)
+
     # Register blueprints
     app.register_blueprint(health_bp)
     app.register_blueprint(quiz_bp)
@@ -204,6 +208,7 @@ def initialize_routes(app: Flask) -> None:
     app.register_blueprint(user_activity_bp)
     app.register_blueprint(multiplayer_bp)
     app.register_blueprint(daily_challenge_bp)
+    app.register_blueprint(account_bp)
 
     logger.info("All routes registered successfully")
 

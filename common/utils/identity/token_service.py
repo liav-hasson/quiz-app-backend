@@ -46,6 +46,7 @@ class TokenService:
             "sub": user.get("_id"),
             "email": user.get("email"),
             "name": user.get("name"),
+            "auth_type": user.get("auth_type", "google"),
             "exp": now + timedelta(days=self._expires_days),
             "iat": now,
         }

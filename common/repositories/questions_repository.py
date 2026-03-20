@@ -80,6 +80,18 @@ class QuestionsRepository(BaseRepository):
             doc["_id"] = str(doc["_id"])
         return docs
 
+    def delete_questions_by_user(self, user_id: str) -> int:
+        """Delete all questions/answers for a user.
+
+        Args:
+            user_id: The user's ID string
+
+        Returns:
+            Number of documents deleted
+        """
+        result = self.collection.delete_many({"user_id": user_id})
+        return result.deleted_count
+
     def get_user_best_category(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Find the category with the highest average score for a user.
         

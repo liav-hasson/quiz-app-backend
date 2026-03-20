@@ -1,7 +1,10 @@
 """Authentication controller for handling OAuth and user authentication."""
 
 import logging
+import re
 from typing import Dict, Any, Optional, Tuple
+
+import bcrypt
 
 from common.utils.identity import (
     GoogleClientNotConfiguredError,
@@ -10,6 +13,13 @@ from common.utils.identity import (
     InvalidGoogleTokenError,
     TokenService,
 )
+
+# Password validation constants
+MIN_PASSWORD_LENGTH = 8
+PASSWORD_PATTERN_UPPERCASE = re.compile(r"[A-Z]")
+PASSWORD_PATTERN_LOWERCASE = re.compile(r"[a-z]")
+PASSWORD_PATTERN_DIGIT = re.compile(r"\d")
+PASSWORD_PATTERN_SPECIAL = re.compile(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>/?]")
 
 logger = logging.getLogger(__name__)
 
@@ -227,3 +237,132 @@ class AuthController:
         except Exception as e:
             logger.error("guest_login_failed error=%s", str(e), exc_info=True)
             return {"error": "Failed to process guest login"}, 500
+
+    # ------------------------------------------------------------------
+    # Username/password ("credentials") authentication
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _validate_password(password: str) -> Optional[str]:
+        """Return an error message if password is too weak, else None."""
+        if len(password) < MIN_PASSWORD_LENGTH:
+            return f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+        if not PASSWORD_PATTERN_UPPERCASE.search(password):
+            return "Password must contain at least one uppercase letter"
+        if not PASSWORD_PATTERN_LOWERCASE.search(password):
+            return "Password must contain at least one lowercase letter"
+        if not PASSWORD_PATTERN_DIGIT.search(password):
+            return "Password must contain at least one digit"
+        if not PASSWORD_PATTERN_SPECIAL.search(password):
+            return "Password must contain at least one special character"
+        return None
+
+    @staticmethod
+    def _hash_password(password: str) -> str:
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
+
+    @staticmethod
+    def _check_password(password: str, hashed: str) -> bool:
+        return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+
+    def handle_credential_register(
+        self, username: str, password: str
+    ) -> Tuple[Dict[str, Any], int]:
+        """Register a new user with username + password.
+
+        Args:
+            username: Desired unique username (2-30 chars, validated by route)
+            password: Plain-text password (validated for strength here)
+
+        Returns:
+            Tuple of (response_data, status_code)
+        """
+        try:
+            # Validate password strength
+            pw_error = self._validate_password(password)
+            if pw_error:
+                return {"error": pw_error}, 400
+
+            # Create user (repository checks username uniqueness)
+            hashed = self._hash_password(password)
+            try:
+                user = self.user_repository.create_credential_user(
+                    username=username,
+                    hashed_password=hashed,
+                )
+            except ValueError as exc:
+                return {"error": str(exc)}, 409
+
+            # Generate JWT
+            app_token = self.token_service.generate(user)
+
+            logger.info("credential_register_success user_id=%s username=%s", user["_id"], username)
+
+            return {
+                "id": str(user["_id"]),
+                "email": user.get("email"),
+                "name": user.get("name"),
+                "username": user.get("username"),
+                "picture": user.get("picture"),
+                "token": app_token,
+                "streak": 0,
+                "experience": 0,
+                "questions_count": 0,
+                "auth_type": "credentials",
+            }, 201
+
+        except Exception as e:
+            logger.error("credential_register_failed error=%s", str(e), exc_info=True)
+            return {"error": "Failed to create account"}, 500
+
+    def handle_credential_login(
+        self, username: str, password: str
+    ) -> Tuple[Dict[str, Any], int]:
+        """Authenticate an existing user with username + password.
+
+        Args:
+            username: The user's username
+            password: Plain-text password
+
+        Returns:
+            Tuple of (response_data, status_code)
+        """
+        try:
+            user = self.user_repository.get_user_by_username(username)
+            if not user:
+                return {"error": "Invalid username or password"}, 401
+
+            auth_type = user.get("auth_type")
+            if auth_type != "credentials":
+                return {"error": "This account uses a different login method"}, 400
+
+            stored_hash = user.get("hashed_password")
+            if not stored_hash or not self._check_password(password, stored_hash):
+                return {"error": "Invalid username or password"}, 401
+
+            # Check and reset streak if needed
+            if self.user_activity_controller:
+                streak_result = self.user_activity_controller.check_and_reset_streak_on_login(user)
+                if streak_result["was_reset"]:
+                    user["streak"] = 0
+
+            app_token = self.token_service.generate(user)
+
+            logger.info("credential_login_success user_id=%s username=%s", user["_id"], username)
+
+            return {
+                "id": str(user["_id"]),
+                "email": user.get("email"),
+                "name": user.get("name"),
+                "username": user.get("username"),
+                "picture": user.get("picture"),
+                "token": app_token,
+                "streak": user.get("streak", 0),
+                "experience": user.get("experience", 0),
+                "questions_count": user.get("questions_count", 0),
+                "auth_type": "credentials",
+            }, 200
+
+        except Exception as e:
+            logger.error("credential_login_failed error=%s", str(e), exc_info=True)
+            return {"error": "Failed to process login"}, 500

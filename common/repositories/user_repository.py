@@ -61,7 +61,7 @@ class UserRepository(BaseRepository):
             return None
 
     def update_user(self, username: str, **kwargs) -> bool:
-        allowed_fields = ["hashed_password", "profile_picture", "experience"]
+        allowed_fields = ["hashed_password", "profile_picture", "experience", "username", "name"]
         update_doc = {k: v for k, v in kwargs.items() if k in allowed_fields}
 
         if not update_doc:
@@ -74,6 +74,85 @@ class UserRepository(BaseRepository):
     def delete_user(self, username: str) -> bool:
         result = self.collection.delete_one({"username": username})
         return result.deleted_count > 0
+
+    def delete_user_by_id(self, user_id: str) -> bool:
+        """Delete a user by their ObjectId."""
+        try:
+            result = self.collection.delete_one({"_id": ObjectId(user_id)})
+            return result.deleted_count > 0
+        except (InvalidId, TypeError):
+            return False
+
+    def create_credential_user(
+        self,
+        username: str,
+        hashed_password: str,
+        name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a user with username/password credentials.
+
+        Args:
+            username: Unique username
+            hashed_password: bcrypt-hashed password
+            name: Display name (defaults to username)
+
+        Returns:
+            The created user document with _id as string
+
+        Raises:
+            ValueError: If username already exists
+        """
+        if self.collection.find_one({"username": username}):
+            raise ValueError(f"Username '{username}' already exists")
+
+        now = datetime.now()
+        user_doc = {
+            "username": username,
+            "email": f"{username}@credentials.quizlabs.local",
+            "name": name or username,
+            "picture": f"https://api.dicebear.com/7.x/avataaars/svg?seed={username}",
+            "hashed_password": hashed_password,
+            "auth_type": "credentials",
+            "experience": 0,
+            "questions_count": 0,
+            "streak": 0,
+            "last_activity_date": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+        result = self.collection.insert_one(user_doc)
+        user = self.collection.find_one({"_id": result.inserted_id})
+        if user:
+            user["_id"] = str(user["_id"])
+        return user
+
+    def update_password(self, user_id: str, new_hashed_password: str) -> bool:
+        """Update a user's hashed password."""
+        try:
+            result = self.collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$set": {"hashed_password": new_hashed_password, "updated_at": datetime.now()}},
+            )
+            return result.modified_count > 0
+        except (InvalidId, TypeError):
+            return False
+
+    def update_username(self, user_id: str, new_username: str) -> bool:
+        """Update a user's username after checking uniqueness.
+
+        Raises:
+            ValueError: If the new username is already taken
+        """
+        if self.collection.find_one({"username": new_username}):
+            raise ValueError(f"Username '{new_username}' already exists")
+        try:
+            result = self.collection.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$set": {"username": new_username, "name": new_username, "updated_at": datetime.now()}},
+            )
+            return result.modified_count > 0
+        except (InvalidId, TypeError):
+            return False
 
     def add_experience(self, username: str, points: int) -> bool:
         result = self.collection.update_one(
