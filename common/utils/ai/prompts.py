@@ -135,3 +135,22 @@ MULTIPLAYER_QUESTION_PROMPTS = {
         "Do NOT include any markdown, code blocks, or extra text. Output must be pure JSON."
     ),
 }
+
+
+DEEP_DIVE_PROMPT = (
+    "You are an expert DevOps technical writer creating a concise educational article.\n\n"
+    "Topic: {keyword} (within {subcategory} / {category})\n\n"
+    "Write a focused ~500-word article in Markdown format that:\n"
+    "- Starts with a level-2 heading (## Title) that includes the keyword\n"
+    "- Has 3-4 sections using level-3 headings (### Section)\n"
+    "- Explains what it is, why it matters, and how to use it\n"
+    "- Includes at least one practical code block or configuration example where relevant\n"
+    "- Uses bullet points for key takeaways\n"
+    "- Is written for intermediate DevOps practitioners\n"
+    "- Ends with a short 'Key Takeaways' bullet list\n\n"
+    "Constraints:\n"
+    "- Stay between 400-600 words\n"
+    "- Use proper Markdown formatting (headers, code fences with language tags, bold for emphasis)\n"
+    "- Be technically accurate and practical\n"
+    "- Do NOT include preamble like 'Here is an article...' — start directly with the ## heading\n"
+)

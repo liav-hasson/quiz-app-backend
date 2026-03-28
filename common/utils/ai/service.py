@@ -8,7 +8,7 @@ from typing import Dict, Optional
 
 from common.utils.config import settings
 
-from .prompts import QUESTION_PROMPTS, EVAL_PROMPT, MULTIPLAYER_QUESTION_PROMPTS, PERFECT_ANSWER_PROMPT
+from .prompts import QUESTION_PROMPTS, EVAL_PROMPT, MULTIPLAYER_QUESTION_PROMPTS, PERFECT_ANSWER_PROMPT, DEEP_DIVE_PROMPT
 from .provider import OpenAIProvider
 
 logger = logging.getLogger(__name__)
@@ -24,12 +24,14 @@ class AIQuestionService:
         eval_prompt: Optional[str] = None,
         multiplayer_prompts: Optional[Dict[int, str]] = None,
         perfect_answer_prompt: Optional[str] = None,
+        deep_dive_prompt: Optional[str] = None,
     ) -> None:
         self._provider = provider or OpenAIProvider()
         self._question_prompts = question_prompts or QUESTION_PROMPTS
         self._eval_prompt = eval_prompt or EVAL_PROMPT
         self._multiplayer_prompts = multiplayer_prompts or MULTIPLAYER_QUESTION_PROMPTS
         self._perfect_answer_prompt = perfect_answer_prompt or PERFECT_ANSWER_PROMPT
+        self._deep_dive_prompt = deep_dive_prompt or DEEP_DIVE_PROMPT
 
     def _get_provider(self, custom_api_key: Optional[str] = None) -> OpenAIProvider:
         """Get a provider, optionally with a custom API key."""
@@ -356,3 +358,56 @@ class AIQuestionService:
         return {
             "perfect_answer": content.strip()
         }
+
+    def generate_deep_dive(
+        self,
+        category: str,
+        subcategory: str,
+        keyword: str,
+        custom_api_key: Optional[str] = None,
+        custom_model: Optional[str] = None,
+    ) -> str:
+        """Generate a ~500-word markdown article about a keyword.
+
+        Returns:
+            Markdown-formatted article string.
+        """
+        model = self._get_model(custom_model)
+        logger.info(
+            "openai_generate_deep_dive_start category=%s subcategory=%s keyword=%s model=%s custom_key=%s",
+            category,
+            subcategory,
+            keyword,
+            model,
+            "yes" if custom_api_key else "no",
+        )
+
+        prompt = self._deep_dive_prompt.format(
+            category=category,
+            subcategory=subcategory,
+            keyword=keyword,
+        )
+
+        provider = self._get_provider(custom_api_key)
+        response = provider.chat_completion(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=800,
+            temperature=0.7,
+        )
+        content = response.choices[0].message.content
+        if content is None:
+            raise ValueError("OpenAI returned empty response")
+
+        tokens_used = 0
+        if hasattr(response, "usage") and response.usage is not None:
+            tokens_used = response.usage.total_tokens
+
+        logger.info(
+            "openai_generate_deep_dive_success category=%s keyword=%s tokens_used=%d content_length=%d",
+            category,
+            keyword,
+            tokens_used,
+            len(content),
+        )
+        return content.strip()

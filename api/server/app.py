@@ -35,6 +35,7 @@ from common.repositories.leaderboard_repository import LeaderboardRepository
 from common.repositories.quiz_repository import QuizRepository
 from common.repositories.lobby_repository import LobbyRepository
 from common.repositories.daily_challenge_repository import DailyChallengeRepository
+from common.repositories.daily_deep_dive_repository import DailyDeepDiveRepository
 from models.data_migrator import DataMigrator
 from common.utils.identity import TokenService, GoogleTokenVerifier
 
@@ -45,6 +46,7 @@ from routes.auth_routes import auth_bp, init_auth_routes
 from routes.user_activity_routes import user_activity_bp, init_user_activity_routes
 from routes.multiplayer_routes import multiplayer_bp, init_multiplayer_routes
 from routes.daily_challenge_routes import daily_challenge_bp, init_daily_challenge_routes
+from routes.daily_deep_dive_routes import daily_deep_dive_bp, init_daily_deep_dive_routes
 from routes.account_routes import account_bp, init_account_routes
 
 # Configure logging
@@ -78,6 +80,7 @@ def initialize_database(app: Flask) -> bool:
         leaderboard_repository = LeaderboardRepository(db_controller)
         lobby_repository = LobbyRepository(db_controller)
         daily_challenge_repository = DailyChallengeRepository(db_controller)
+        daily_deep_dive_repository = DailyDeepDiveRepository(db_controller)
 
         # Ensure MongoDB indexes are created for lobbies
         # This creates: unique index on lobby_code, TTL index on expire_at
@@ -139,6 +142,7 @@ def initialize_database(app: Flask) -> bool:
         app.extensions["leaderboard_repository"] = leaderboard_repository
         app.extensions["lobby_repository"] = lobby_repository
         app.extensions["daily_challenge_repository"] = daily_challenge_repository
+        app.extensions["daily_deep_dive_repository"] = daily_deep_dive_repository
         app.extensions["token_service"] = token_service
         app.extensions["google_token_verifier"] = google_token_verifier
         app.extensions["oauth"] = oauth
@@ -198,6 +202,10 @@ def initialize_routes(app: Flask) -> None:
     daily_challenge_repository = app.extensions["daily_challenge_repository"]
     init_daily_challenge_routes(daily_challenge_repository, quiz_repository, user_repository)
 
+    # Initialize daily deep dive routes
+    daily_deep_dive_repository = app.extensions["daily_deep_dive_repository"]
+    init_daily_deep_dive_routes(daily_deep_dive_repository, quiz_repository, user_repository)
+
     # Initialize account management routes
     init_account_routes(user_repository, questions_repository)
 
@@ -208,6 +216,7 @@ def initialize_routes(app: Flask) -> None:
     app.register_blueprint(user_activity_bp)
     app.register_blueprint(multiplayer_bp)
     app.register_blueprint(daily_challenge_bp)
+    app.register_blueprint(daily_deep_dive_bp)
     app.register_blueprint(account_bp)
 
     logger.info("All routes registered successfully")
