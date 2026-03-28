@@ -130,8 +130,8 @@ def get_daily_deep_dive():
                 if created.tzinfo is None:
                     created = created.replace(tzinfo=timezone.utc)
                 if (datetime.now(timezone.utc) - created).total_seconds() > _STALE_THRESHOLD_SECONDS:
-                logger.warning("daily_deep_dive_stale — deleting and allowing retry")
-                _deep_dive_repo.delete_today()
+                    logger.warning("daily_deep_dive_stale — deleting and allowing retry")
+                    _deep_dive_repo.delete_today()
             return jsonify({"status": "generating"}), 202
 
         # Article is ready

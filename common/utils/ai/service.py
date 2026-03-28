@@ -404,7 +404,7 @@ class AIQuestionService:
                 {"role": "system", "content": self._deep_dive_system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            max_tokens=800,
+            max_tokens=4096,
             temperature=0.7,
         )
         content = response.choices[0].message.content
