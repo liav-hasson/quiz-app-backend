@@ -58,11 +58,16 @@ def _generate_daily_article(custom_api_key=None, custom_model=None) -> dict:
     keywords = _quiz_repo.get_keywords_by_topic_subtopic(category, subject)
     keyword = random.choice(keywords) if keywords else subject
 
+    # Fetch a style modifier as an optional creative nudge
+    style_modifiers = _quiz_repo.get_style_modifiers_by_topic_subtopic(category, subject)
+    style_modifier = random.choice(style_modifiers) if style_modifiers else None
+
     ai_service = get_service()
     content = ai_service.generate_deep_dive(
         category,
         subject,
         keyword,
+        style_modifier=style_modifier,
         custom_api_key=custom_api_key,
         custom_model=custom_model,
     )
@@ -175,3 +180,15 @@ def get_deep_dive_archive():
     except Exception as e:
         logger.error("daily_deep_dive_archive_failed error=%s", e, exc_info=True)
         return jsonify({"error": f"Failed to get archive: {str(e)}"}), 500
+
+
+@daily_deep_dive_bp.route("/today", methods=["DELETE"])
+def delete_today_article():
+    """Delete today's article so it can be re-generated. Dev/testing helper."""
+    try:
+        result = _deep_dive_repo.collection.delete_many({"date": _deep_dive_repo._today_key()})
+        logger.info("daily_deep_dive_deleted count=%d", result.deleted_count)
+        return jsonify({"deleted": result.deleted_count}), 200
+    except Exception as e:
+        logger.error("daily_deep_dive_delete_failed error=%s", e, exc_info=True)
+        return jsonify({"error": str(e)}), 500

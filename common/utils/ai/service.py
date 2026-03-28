@@ -364,6 +364,7 @@ class AIQuestionService:
         category: str,
         subcategory: str,
         keyword: str,
+        style_modifier: Optional[str] = None,
         custom_api_key: Optional[str] = None,
         custom_model: Optional[str] = None,
     ) -> str:
@@ -374,18 +375,24 @@ class AIQuestionService:
         """
         model = self._get_model(custom_model)
         logger.info(
-            "openai_generate_deep_dive_start category=%s subcategory=%s keyword=%s model=%s custom_key=%s",
+            "openai_generate_deep_dive_start category=%s subcategory=%s keyword=%s style=%s model=%s custom_key=%s",
             category,
             subcategory,
             keyword,
+            style_modifier,
             model,
             "yes" if custom_api_key else "no",
         )
+
+        style_hint = ""
+        if style_modifier:
+            style_hint = f"Consider leaning into a *{style_modifier}* angle if it fits naturally, but don't force it.\n"
 
         prompt = self._deep_dive_prompt.format(
             category=category,
             subcategory=subcategory,
             keyword=keyword,
+            style_hint=style_hint,
         )
 
         provider = self._get_provider(custom_api_key)
