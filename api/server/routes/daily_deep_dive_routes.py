@@ -217,15 +217,3 @@ def get_deep_dive_archive():
     except Exception as e:
         logger.error("daily_deep_dive_archive_failed error=%s", e, exc_info=True)
         return jsonify({"error": f"Failed to get archive: {str(e)}"}), 500
-
-
-@daily_deep_dive_bp.route("/today", methods=["DELETE"])
-def delete_today_article():
-    """Delete today's article so it can be re-generated. Dev/testing helper."""
-    try:
-        deleted = _deep_dive_repo.delete_today()
-        logger.info("daily_deep_dive_deleted count=%d", deleted)
-        return jsonify({"deleted": deleted}), 200
-    except Exception as e:
-        logger.error("daily_deep_dive_delete_failed error=%s", e, exc_info=True)
-        return jsonify({"error": str(e)}), 500

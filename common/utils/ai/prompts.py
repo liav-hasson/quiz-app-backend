@@ -155,5 +155,5 @@ DEEP_DIVE_SYSTEM_PROMPT = (
 
 DEEP_DIVE_USER_PROMPT = (
     "Today's deep dive topic: {keyword}. (area: {subcategory} / {category}).\n"
-    "Article style: {style_modifier}\n"
+    "Article style: {style_modifier}. - Use only if fits the topic, else ignore.\n"
 )
