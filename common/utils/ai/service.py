@@ -51,7 +51,7 @@ class AIQuestionService:
         category: str,
         subcategory: str,
         keyword: str,
-        style_modifier: Optional[str],
+        style_modifier: str,
     ) -> str:
         prompt_template = self._question_prompts[difficulty]
         difficulty_label = {1: "easy", 2: "intermediate", 3: "advanced"}[difficulty]
@@ -60,7 +60,7 @@ class AIQuestionService:
             subcategory=subcategory,
             keyword=keyword,
             difficulty_label=difficulty_label,
-            style_modifier=style_modifier or "general explanation",
+            style_modifier=style_modifier,
         )
 
     def generate_question(
@@ -69,7 +69,7 @@ class AIQuestionService:
         subcategory: str,
         keyword: str,
         difficulty: int,
-        style_modifier: Optional[str] = None,
+        style_modifier: str,
         custom_api_key: Optional[str] = None,
         custom_model: Optional[str] = None,
     ):
@@ -366,7 +366,7 @@ class AIQuestionService:
         category: str,
         subcategory: str,
         keyword: str,
-        style_modifier: Optional[str] = None,
+        style_modifier: str,
         custom_api_key: Optional[str] = None,
         custom_model: Optional[str] = None,
     ) -> str:
@@ -386,15 +386,11 @@ class AIQuestionService:
             "yes" if custom_api_key else "no",
         )
 
-        style_hint = ""
-        if style_modifier:
-            style_hint = f"Consider leaning into a *{style_modifier}* angle if it fits naturally, but don't force it.\n"
-
         user_prompt = self._deep_dive_user_prompt.format(
             category=category,
             subcategory=subcategory,
             keyword=keyword,
-            style_hint=style_hint,
+            style_modifier=style_modifier,
         )
 
         provider = self._get_provider(custom_api_key)

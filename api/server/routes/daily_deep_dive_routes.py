@@ -60,9 +60,9 @@ def _generate_daily_article(custom_api_key=None, custom_model=None) -> dict:
     keywords = _quiz_repo.get_keywords_by_topic_subtopic(category, subject)
     keyword = random.choice(keywords) if keywords else subject
 
-    # Fetch a style modifier as an optional creative nudge
+    # Fetch a style modifier
     style_modifiers = _quiz_repo.get_style_modifiers_by_topic_subtopic(category, subject)
-    style_modifier = random.choice(style_modifiers) if style_modifiers else None
+    style_modifier = random.choice(style_modifiers) if style_modifiers else "general explanation"
 
     ai_service = get_service()
     content = ai_service.generate_deep_dive(

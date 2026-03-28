@@ -55,13 +55,16 @@ def _generate_daily_question(custom_api_key=None, custom_model=None) -> str:
     keywords = _quiz_repo.get_keywords_by_topic_subtopic(category, subject)
     keyword = random.choice(keywords) if keywords else subject
 
+    style_modifiers = _quiz_repo.get_style_modifiers_by_topic_subtopic(category, subject)
+    style_modifier = random.choice(style_modifiers) if style_modifiers else "general explanation"
+
     ai_service = get_service()
     question = ai_service.generate_question(
         category,
         subject,
         keyword,
         difficulty=1,  # easy
-        style_modifier=None,
+        style_modifier=style_modifier,
         custom_api_key=custom_api_key,
         custom_model=custom_model,
     )

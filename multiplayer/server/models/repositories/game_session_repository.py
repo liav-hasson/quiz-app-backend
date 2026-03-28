@@ -162,7 +162,6 @@ class GameSessionRepository(BaseRepository):
                         subcategory="General",  # Could be enhanced to fetch real subcategory
                         keyword=keyword,
                         difficulty=difficulty,
-                        style_modifier=None  # Random style could be added here
                     )
                     
                     # Format for game session storage
@@ -234,7 +233,6 @@ class GameSessionRepository(BaseRepository):
                         subcategory=subject,  # Use the subject as subcategory
                         keyword=keyword,
                         difficulty=difficulty,
-                        style_modifier=None
                     )
                     
                     # Format for game session storage

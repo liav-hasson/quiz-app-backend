@@ -148,7 +148,7 @@ def generate_question_route():
             )
             return jsonify({"error": "No keywords found for this category and subject"}), 404, headers
 
-        style_modifier = quiz_controller.get_random_style_modifier(data["category"], data["subject"])
+        style_modifier = quiz_controller.get_random_style_modifier(data["category"], data["subject"]) or "general explanation"
         
         # Get custom AI settings from headers
         custom_api_key, custom_model = _get_custom_ai_settings()
