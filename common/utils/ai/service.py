@@ -8,7 +8,7 @@ from typing import Dict, Optional
 
 from common.utils.config import settings
 
-from .prompts import QUESTION_PROMPTS, EVAL_PROMPT, MULTIPLAYER_QUESTION_PROMPTS, PERFECT_ANSWER_PROMPT, DEEP_DIVE_PROMPT
+from .prompts import QUESTION_PROMPTS, EVAL_PROMPT, MULTIPLAYER_QUESTION_PROMPTS, PERFECT_ANSWER_PROMPT, DEEP_DIVE_SYSTEM_PROMPT, DEEP_DIVE_USER_PROMPT
 from .provider import OpenAIProvider
 
 logger = logging.getLogger(__name__)
@@ -24,14 +24,16 @@ class AIQuestionService:
         eval_prompt: Optional[str] = None,
         multiplayer_prompts: Optional[Dict[int, str]] = None,
         perfect_answer_prompt: Optional[str] = None,
-        deep_dive_prompt: Optional[str] = None,
+        deep_dive_system_prompt: Optional[str] = None,
+        deep_dive_user_prompt: Optional[str] = None,
     ) -> None:
         self._provider = provider or OpenAIProvider()
         self._question_prompts = question_prompts or QUESTION_PROMPTS
         self._eval_prompt = eval_prompt or EVAL_PROMPT
         self._multiplayer_prompts = multiplayer_prompts or MULTIPLAYER_QUESTION_PROMPTS
         self._perfect_answer_prompt = perfect_answer_prompt or PERFECT_ANSWER_PROMPT
-        self._deep_dive_prompt = deep_dive_prompt or DEEP_DIVE_PROMPT
+        self._deep_dive_system_prompt = deep_dive_system_prompt or DEEP_DIVE_SYSTEM_PROMPT
+        self._deep_dive_user_prompt = deep_dive_user_prompt or DEEP_DIVE_USER_PROMPT
 
     def _get_provider(self, custom_api_key: Optional[str] = None) -> OpenAIProvider:
         """Get a provider, optionally with a custom API key."""
@@ -388,7 +390,7 @@ class AIQuestionService:
         if style_modifier:
             style_hint = f"Consider leaning into a *{style_modifier}* angle if it fits naturally, but don't force it.\n"
 
-        prompt = self._deep_dive_prompt.format(
+        user_prompt = self._deep_dive_user_prompt.format(
             category=category,
             subcategory=subcategory,
             keyword=keyword,
@@ -398,7 +400,10 @@ class AIQuestionService:
         provider = self._get_provider(custom_api_key)
         response = provider.chat_completion(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": self._deep_dive_system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
             max_tokens=800,
             temperature=0.7,
         )

@@ -57,7 +57,7 @@ class OpenAIProvider:
         """Return an authenticated OpenAI client."""
 
         api_key = self._resolve_api_key()
-        return OpenAI(api_key=api_key)
+        return OpenAI(api_key=api_key, timeout=45.0)
 
     def chat_completion(
         self,
