@@ -2,6 +2,8 @@
 
 import logging
 import random
+import threading
+from datetime import datetime, timezone
 from typing import Optional
 
 from flask import Blueprint, request, jsonify, g
@@ -79,9 +81,28 @@ def _generate_daily_article(custom_api_key=None, custom_model=None) -> dict:
     }
 
 
+_STALE_THRESHOLD_SECONDS = 120  # 2 minutes — if still "generating", consider it failed
+
+
+def _generate_article_background(custom_api_key=None, custom_model=None):
+    """Background thread: generate article and update the placeholder."""
+    try:
+        generated = _generate_daily_article(custom_api_key, custom_model)
+        _deep_dive_repo.update_article_content(
+            keyword=generated["keyword"],
+            category=generated["category"],
+            subject=generated["subject"],
+            content=generated["content"],
+        )
+        logger.info("daily_deep_dive_bg_generated keyword=%s", generated["keyword"])
+    except Exception as e:
+        logger.error("daily_deep_dive_bg_failed error=%s", e, exc_info=True)
+        _deep_dive_repo.delete_today()
+
+
 @daily_deep_dive_bp.route("", methods=["GET"])
 def get_daily_deep_dive():
-    """Return today's deep dive article, generating it on first hit."""
+    """Return today's deep dive article, generating it in background on first hit."""
     custom_api_key, custom_model = _get_custom_ai_settings()
     user = getattr(g, "user", None)
     user_id = user.get("_id") if user else None
@@ -89,26 +110,39 @@ def get_daily_deep_dive():
     try:
         article = _deep_dive_repo.get_today_article()
 
+        # No article at all — save placeholder and kick off background generation
         if not article:
-            generated = _generate_daily_article(custom_api_key, custom_model)
-            article = _deep_dive_repo.save_article(
-                keyword=generated["keyword"],
-                category=generated["category"],
-                subject=generated["subject"],
-                content=generated["content"],
-            )
-            logger.info("daily_deep_dive_generated date=%s keyword=%s", article["date"], article["keyword"])
+            _deep_dive_repo.save_placeholder()
+            threading.Thread(
+                target=_generate_article_background,
+                args=(custom_api_key, custom_model),
+                daemon=True,
+            ).start()
+            logger.info("daily_deep_dive_generation_started")
+            return jsonify({"status": "generating"}), 202
 
+        status = article.get("status", "ready")
+
+        # Still generating — check for stale
+        if status == "generating":
+            created = article.get("created_at")
+            if created and (datetime.now(timezone.utc) - created).total_seconds() > _STALE_THRESHOLD_SECONDS:
+                logger.warning("daily_deep_dive_stale — deleting and allowing retry")
+                _deep_dive_repo.delete_today()
+            return jsonify({"status": "generating"}), 202
+
+        # Article is ready
         xp_claimed = False
         if user_id:
             xp_claimed = _deep_dive_repo.has_user_claimed_xp(user_id)
 
         return jsonify({
+            "status": "ready",
             "date": article["date"],
-            "keyword": article["keyword"],
-            "category": article["category"],
-            "subject": article["subject"],
-            "content": article["content"],
+            "keyword": article.get("keyword", ""),
+            "category": article.get("category", ""),
+            "subject": article.get("subject", ""),
+            "content": article.get("content", ""),
             "xp_reward": XP_REWARD,
             "xp_claimed": xp_claimed,
         }), 200
@@ -186,9 +220,9 @@ def get_deep_dive_archive():
 def delete_today_article():
     """Delete today's article so it can be re-generated. Dev/testing helper."""
     try:
-        result = _deep_dive_repo.collection.delete_many({"date": _deep_dive_repo._today_key()})
-        logger.info("daily_deep_dive_deleted count=%d", result.deleted_count)
-        return jsonify({"deleted": result.deleted_count}), 200
+        deleted = _deep_dive_repo.delete_today()
+        logger.info("daily_deep_dive_deleted count=%d", deleted)
+        return jsonify({"deleted": deleted}), 200
     except Exception as e:
         logger.error("daily_deep_dive_delete_failed error=%s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
