@@ -99,6 +99,24 @@ class DailyChallengeRepository(BaseRepository):
 
     # --- Streak tracking ---
 
+    def get_user_history(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get a user's past daily challenge answers, most recent first."""
+        pipeline = [
+            {"$unwind": "$answers"},
+            {"$match": {"answers.user_id": user_id}},
+            {"$sort": {"date": -1}},
+            {"$limit": limit},
+            {"$project": {
+                "_id": 0,
+                "date": 1,
+                "question": 1,
+                "score": "$answers.score",
+                "feedback": "$answers.feedback",
+                "answered_at": "$answers.answered_at",
+            }},
+        ]
+        return list(self.collection.aggregate(pipeline))
+
     def _streak_collection(self):
         """Access the daily_streaks collection."""
         return self._db_controller.db["daily_streaks"]

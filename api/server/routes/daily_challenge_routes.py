@@ -32,49 +32,9 @@ def init_daily_challenge_routes(
     _user_repo = user_repo
 
 
-def _get_custom_ai_settings():
-    custom_api_key = request.headers.get("X-OpenAI-API-Key")
-    custom_model = request.headers.get("X-OpenAI-Model")
-    return custom_api_key, custom_model
-
-
-def _generate_daily_question(custom_api_key=None, custom_model=None) -> str:
-    """Generate a random easy-level question for the daily challenge."""
-    import random
-
-    categories = _quiz_repo.get_all_topics()
-    if not categories:
-        raise RuntimeError("No categories available")
-    category = random.choice(categories)
-
-    subjects = _quiz_repo.get_subtopics_by_topic(category)
-    if not subjects:
-        raise RuntimeError(f"No subjects for category {category}")
-    subject = random.choice(subjects)
-
-    keywords = _quiz_repo.get_keywords_by_topic_subtopic(category, subject)
-    keyword = random.choice(keywords) if keywords else subject
-
-    style_modifiers = _quiz_repo.get_style_modifiers_by_topic_subtopic(category, subject)
-    style_modifier = random.choice(style_modifiers) if style_modifiers else "general explanation"
-
-    ai_service = get_service()
-    question = ai_service.generate_question(
-        category,
-        subject,
-        keyword,
-        difficulty=1,  # easy
-        style_modifier=style_modifier,
-        custom_api_key=custom_api_key,
-        custom_model=custom_model,
-    )
-    return question
-
-
 @daily_challenge_bp.route("", methods=["GET"])
 def get_daily_challenge():
-    """Return today's challenge question, generating it on first hit."""
-    custom_api_key, custom_model = _get_custom_ai_settings()
+    """Return today's pre-generated challenge question."""
     user = getattr(g, "user", None)
     user_id = user.get("_id") if user else None
 
@@ -82,10 +42,8 @@ def get_daily_challenge():
         challenge = _challenge_repo.get_today_challenge()
 
         if not challenge:
-            # Lazy-generate on first request of the day
-            question_text = _generate_daily_question(custom_api_key, custom_model)
-            challenge = _challenge_repo.save_challenge(question_text)
-            logger.info("daily_challenge_generated date=%s", challenge["date"])
+            logger.warning("daily_challenge_not_found — cronjob may not have run")
+            return jsonify({"error": "Today's daily challenge is not available yet. Please try again later."}), 404
 
         # Check if user already answered
         user_answer = None
@@ -135,16 +93,12 @@ def submit_daily_answer():
     if not challenge:
         return jsonify({"error": "No daily challenge available"}), 404
 
-    custom_api_key, custom_model = _get_custom_ai_settings()
-
     try:
         ai_service = get_service()
         evaluation = ai_service.evaluate_answer(
             challenge["question"],
             answer,
             difficulty=1,
-            custom_api_key=custom_api_key,
-            custom_model=custom_model,
         )
 
         score = evaluation.get("score", 0)
@@ -210,4 +164,22 @@ def get_daily_streak():
         return jsonify(streak_data), 200
     except Exception as e:
         logger.error("daily_streak_get_failed error=%s", e, exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@daily_challenge_bp.route("/history", methods=["GET"])
+def get_daily_history():
+    """Return the current user's past daily challenge answers."""
+    user = getattr(g, "user", None)
+    if not user:
+        return jsonify({"error": "Authentication required"}), 401
+
+    user_id = user.get("_id")
+    limit = min(int(request.args.get("limit", 10)), 50)
+
+    try:
+        history = _challenge_repo.get_user_history(user_id, limit=limit)
+        return jsonify({"history": history}), 200
+    except Exception as e:
+        logger.error("daily_history_get_failed error=%s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
