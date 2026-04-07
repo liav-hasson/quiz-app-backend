@@ -25,7 +25,7 @@ class QuizRepository(BaseRepository):
                             "topic": topic,
                             "subtopic": subtopic,
                             "keywords": content.get("keywords", []),
-                            "style_modifiers": content.get("style_modifiers", content.get("styles", [])),
+                            "style_modifiers": content.get("style_modifiers", []),
                             "created_at": datetime.now(),
                             "updated_at": datetime.now(),
                         }
