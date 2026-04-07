@@ -2,30 +2,30 @@
 
 QUESTION_PROMPTS = {
     1: (
-        "You are a DevOps interviewer, create a very easy technical question.\n\n"
+        "You are a DevOps interviewer, create an very easy technical question.\n\n"
         "Topic: {subcategory} in {category}.\n"
-        "Focus keyword: {keyword}.\n"
-        "Question style: {style_modifier}.\n\n"
+        "Focus keyword: {keyword}\n"
+        "Question style: {style_modifier}\n\n"
         "Create a SHORT, CLEAR question that:\n"
-        "- Is appropriate for a beginner DevOps student.\n"
+        "- Is appropriate for beginner DevOps student.\n"
         "- Can be answered in 2-3 sentences.\n\n"
         "Generate only the question, no additional text."
     ),
     2: (
         "You are a DevOps interviewer, create a medium technical question.\n\n"
-        "Topic: {subcategory} in {category}.\n"
-        "Focus keyword: {keyword}.\n"
-        "Question style: {style_modifier}.\n\n"
+        "Topic: {subcategory} in {category}\n"
+        "Focus keyword: {keyword}\n"
+        "Question style: {style_modifier}\n\n"
         "Create a SHORT, PRACTICAL question that:\n"
         "- Is appropriate for entry-level DevOps engineers.\n"
         "- Can be answered in 3-4 sentences.\n\n"
         "Generate only the question, no additional text."
     ),
     3: (
-        "You are a DevOps interviewer, create a hard level technical question.\n\n"
-        "Topic: {subcategory} in {category}.\n"
-        "Focus keyword: {keyword}.\n"
-        "Question style: {style_modifier}.\n\n"
+        "You are a DevOps interviewer, create an hard level technical question.\n\n"
+        "Topic: {subcategory} in {category}\n"
+        "Focus keyword: {keyword}\n"
+        "Question style: {style_modifier}\n\n"
         "Create a SHORT, CHALLENGING question that:\n"
         "- Is appropriate for senior DevOps engineers.\n"
         "- Can be answered in 3-4 sentences.\n\n"
@@ -40,9 +40,9 @@ EVAL_PROMPT = (
     "Question difficulty: {difficulty_label}.\n"
     'Q: "{question}"\n'
     'A: "{answer}"\n\n'
-    "Tasks:\n"
+    "Tasks: \n"
     "1. Review the student's answer based on the question, and expected difficulty. Expect a short response, no more than 100 words. Ignore casing and punctuation in evaluation.\n"
-    "2. Give short feedback on the user's answer quality, note only on significant mistakes. No more than 50 words.\n"
+    "2. Give short feedback on the user's answer quality, note only on significant mistakes. no more than 50 words.\n"
     "3. Scoring: 10 = fully correct; 8–9 = mostly correct; 6–7 = partly correct; 4–5 = major gaps; 0–3 = mostly wrong.\n\n"
     'Output format: {{"score": "X/10", "feedback": "your feedback here"}}\n'
     "Do NOT wrap the JSON in ```json or ``` markers."
@@ -56,9 +56,9 @@ PERFECT_ANSWER_PROMPT = (
     "- Be clear and well-structured\n"
     "- Include all key concepts and details\n"
     "- Use proper technical terminology\n"
-    "- Be 3-5 sentences (approximately 50-100 words).\n"
-    "- Serve as a reference for what a perfect answer looks like.\n\n"
-    "Return ONLY the answer text, no additional formatting or preamble. "
+    "- Be 3-5 sentences (approximately 50-100 words)\n"
+    "- Serve as a reference for what a perfect answer looks like\n\n"
+    "Return ONLY the answer text, no additional formatting or preamble."
     "Do NOT wrap the JSON in ```json or ``` markers."
 )
 
@@ -69,7 +69,7 @@ MULTIPLAYER_QUESTION_PROMPTS = {
         "Category: {category}\n"
         "Subject: {subcategory}\n"
         "Focus keyword: {keyword}\n"
-        "Focus style: basic definition or general understanding.\n"
+        "Focus style: basic definition or general understanding\n"
         "Difficulty: VERY EASY (appropriate for a student just starting out)\n\n"
         "Create a multiple-choice question that:\n"
         "- The question MUST be under 20 words and contain the focus keyword\n"
@@ -92,7 +92,7 @@ MULTIPLAYER_QUESTION_PROMPTS = {
         "Category: {category}\n"
         "Subject: {subcategory}\n"
         "Focus keyword: {keyword}\n"
-        "Focus style: concept knowledge, comparison or purpose.\n"
+        "Focus style: concept knowledge, comparison or purpose\n"
         "Difficulty: EASY (appropriate for an entry-level DevOps student)\n\n"
         "Create a multiple-choice question that:\n"
         "- The question MUST be under 25 words and contain the focus keyword\n"
@@ -115,7 +115,7 @@ MULTIPLAYER_QUESTION_PROMPTS = {
         "Category: {category}\n"
         "Subject: {subcategory}\n"
         "Focus keyword: {keyword}\n"
-        "Focus style: challenge concept knowledge and purpose.\n"
+        "Focus style: challange concept knowledge and purpose\n"
         "Difficulty: MEDIUM (appropriate for a junior DevOps engineer)\n\n"
         "Create a multiple-choice question that:\n"
         "- The question MUST be under 25 words and contain the focus keyword\n"
@@ -155,5 +155,5 @@ DEEP_DIVE_SYSTEM_PROMPT = (
 
 DEEP_DIVE_USER_PROMPT = (
     "Today's deep dive topic: {keyword}. (area: {subcategory} / {category}).\n"
-    "Article style: {style_modifier}. Use only if it fits the topic, otherwise ignore.\n"
+    "Article style: {style_modifier}. - Use only if fits the topic, else ignore.\n"
 )

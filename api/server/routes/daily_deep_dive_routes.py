@@ -1,13 +1,16 @@
 """Daily Deep Dive routes — daily AI-generated educational article."""
 
 import logging
+import random
+import threading
 from datetime import datetime, timezone
 from typing import Optional
 
-from flask import Blueprint, jsonify, g
+from flask import Blueprint, request, jsonify, g
 from common.repositories.daily_deep_dive_repository import DailyDeepDiveRepository
 from common.repositories.quiz_repository import QuizRepository
 from common.repositories.user_repository import UserRepository
+from common.utils.ai import get_service
 
 logger = logging.getLogger(__name__)
 
@@ -32,34 +35,104 @@ def init_daily_deep_dive_routes(
     _user_repo = user_repo
 
 
+def _get_custom_ai_settings():
+    custom_api_key = request.headers.get("X-OpenAI-API-Key")
+    custom_model = request.headers.get("X-OpenAI-Model")
+    return custom_api_key, custom_model
+
+
+def _generate_daily_article(custom_api_key=None, custom_model=None) -> dict:
+    """Pick a random keyword and generate a deep dive article.
+
+    Returns:
+        dict with keys: keyword, category, subject, content
+    """
+    categories = _quiz_repo.get_all_topics()
+    if not categories:
+        raise RuntimeError("No categories available")
+    category = random.choice(categories)
+
+    subjects = _quiz_repo.get_subtopics_by_topic(category)
+    if not subjects:
+        raise RuntimeError(f"No subjects for category {category}")
+    subject = random.choice(subjects)
+
+    keywords = _quiz_repo.get_keywords_by_topic_subtopic(category, subject)
+    keyword = random.choice(keywords) if keywords else subject
+
+    # Fetch a style modifier
+    style_modifiers = _quiz_repo.get_style_modifiers_by_topic_subtopic(category, subject)
+    style_modifier = random.choice(style_modifiers) if style_modifiers else "general explanation"
+
+    ai_service = get_service()
+    content = ai_service.generate_deep_dive(
+        category,
+        subject,
+        keyword,
+        style_modifier=style_modifier,
+        custom_api_key=custom_api_key,
+        custom_model=custom_model,
+    )
+    return {
+        "keyword": keyword,
+        "category": category,
+        "subject": subject,
+        "content": content,
+    }
+
+
 _STALE_THRESHOLD_SECONDS = 120  # 2 minutes — if still "generating", consider it failed
+
+
+def _generate_article_background(custom_api_key=None, custom_model=None):
+    """Background thread: generate article and update the placeholder."""
+    try:
+        generated = _generate_daily_article(custom_api_key, custom_model)
+        _deep_dive_repo.update_article_content(
+            keyword=generated["keyword"],
+            category=generated["category"],
+            subject=generated["subject"],
+            content=generated["content"],
+        )
+        logger.info("daily_deep_dive_bg_generated keyword=%s", generated["keyword"])
+    except Exception as e:
+        logger.error("daily_deep_dive_bg_failed error=%s", e, exc_info=True)
+        _deep_dive_repo.delete_today()
 
 
 @daily_deep_dive_bp.route("", methods=["GET"])
 def get_daily_deep_dive():
-    """Return today's pre-generated deep dive article."""
+    """Return today's deep dive article, generating it in background on first hit."""
+    custom_api_key, custom_model = _get_custom_ai_settings()
     user = getattr(g, "user", None)
     user_id = user.get("_id") if user else None
 
     try:
         article = _deep_dive_repo.get_today_article()
 
+        # No article at all — save placeholder and kick off background generation
         if not article:
-            logger.warning("daily_deep_dive_not_found — cronjob may not have run")
-            return jsonify({"error": "Today's deep dive is not available yet. Please try again later."}), 404
+            _deep_dive_repo.save_placeholder()
+            threading.Thread(
+                target=_generate_article_background,
+                args=(custom_api_key, custom_model),
+                daemon=True,
+            ).start()
+            logger.info("daily_deep_dive_generation_started")
+            return jsonify({"status": "generating"}), 202
 
         status = article.get("status", "ready")
 
-        # Still generating (stale placeholder) — clean up
+        # Still generating — check for stale
         if status == "generating":
             created = article.get("created_at")
             if created:
                 if created.tzinfo is None:
                     created = created.replace(tzinfo=timezone.utc)
                 if (datetime.now(timezone.utc) - created).total_seconds() > _STALE_THRESHOLD_SECONDS:
-                    logger.warning("daily_deep_dive_stale — deleting placeholder")
+                    logger.warning("daily_deep_dive_stale — deleting and allowing retry")
                     _deep_dive_repo.delete_today()
-            return jsonify({"error": "Today's deep dive is not available yet. Please try again later."}), 404
+            return jsonify({"status": "generating"}), 202
 
         # Article is ready
         xp_claimed = False
