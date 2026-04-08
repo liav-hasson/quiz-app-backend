@@ -211,3 +211,21 @@ def get_daily_streak():
     except Exception as e:
         logger.error("daily_streak_get_failed error=%s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
+
+
+@daily_challenge_bp.route("/history", methods=["GET"])
+def get_daily_history():
+    """Return the current user's past daily challenge answers."""
+    user = getattr(g, "user", None)
+    if not user:
+        return jsonify({"error": "Authentication required"}), 401
+
+    user_id = user.get("_id")
+    limit = min(int(request.args.get("limit", 10)), 50)
+
+    try:
+        history = _challenge_repo.get_user_history(user_id, limit=limit)
+        return jsonify({"history": history}), 200
+    except Exception as e:
+        logger.error("daily_history_get_failed error=%s", e, exc_info=True)
+        return jsonify({"error": str(e)}), 500
